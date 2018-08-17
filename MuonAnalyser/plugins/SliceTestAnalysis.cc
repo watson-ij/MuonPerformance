@@ -1,4 +1,3 @@
-// cd /cms/ldap_home/iawatson/scratch/GEM/CMSSW_10_1_5/src/ && eval `scramv1 runtime -sh` && eval `scramv1 runtime -sh` && scram b -j 10
 // cd ../../.. && source /cvmfs/cms.cern.ch/cmsset_default.sh && eval `scramv1 runtime -sh` && eval `scramv1 runtime -sh` && scram b -j 10
 // system include files
 #include <memory>
@@ -104,10 +103,14 @@ private:
   int m_nbounds;
   int m_quality;
   float m_pt, m_eta, m_phi;
+  // GEMHits included in Muon
   vector<int> m_roll, m_chamber, m_layer; // hit info
   vector<float> m_resx, m_resy, m_pullx, m_pully;
+  // Propagation only information
   vector<int> m_in_roll, m_in_chamber, m_in_layer; // propagation bound info
   vector<float> m_in_globalPhi, m_in_globalEta, m_in_nearGemPhi, m_in_nearGemEta; // global info
+  vector<float> m_in_x, m_in_y, m_in_gemx, m_in_gemy, m_in_pullx, m_in_pully, m_in_resx, m_in_resy;
+  vector<int> m_in_nearGemNStrips, m_in_nearGemFirstStrip;
   
   TTree *t_run;
   TTree *t_muon;
@@ -183,6 +186,18 @@ SliceTestAnalysis::SliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("in_globalEta", &m_in_globalEta);
   t_muon->Branch("in_nearGemPhi", &m_in_nearGemPhi);
   t_muon->Branch("in_nearGemEta", &m_in_nearGemEta);
+
+  t_muon->Branch("in_x", &m_in_x);
+  t_muon->Branch("in_y", &m_in_y);
+  t_muon->Branch("in_gemx", &m_in_gemx);
+  t_muon->Branch("in_gemy", &m_in_gemy);
+  t_muon->Branch("in_pullx", &m_in_pullx);
+  t_muon->Branch("in_pully", &m_in_pully);
+  t_muon->Branch("in_resx", &m_in_resx);
+  t_muon->Branch("in_resy", &m_in_resy);
+  t_muon->Branch("in_nearGemNStrips", &m_in_nearGemNStrips);
+  t_muon->Branch("in_nearGemFirststrip", &m_in_nearGemFirstStrip);
+  
 
   t_hit = fs->make<TTree>("Hit", "Hit");
   t_hit->Branch("run", &b_run, "run/I");
@@ -284,6 +299,7 @@ SliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSet
     m_resx.clear(); m_resy.clear(); m_pullx.clear(); m_pully.clear();
     m_in_roll.clear(); m_in_chamber.clear(); m_in_layer.clear();
     m_in_globalPhi.clear(); m_in_globalEta.clear(); m_in_nearGemPhi.clear(); m_in_nearGemEta.clear();
+    m_in_x.clear(); m_in_y.clear(); m_in_gemx.clear(); m_in_gemy.clear(); m_in_pullx.clear(); m_in_pully.clear(); m_in_resx.clear(); m_in_resy.clear();
     
     edm::RefToBase<reco::Muon> muRef = muons->refAt(i);
     const reco::Muon* mu = muRef.get();
@@ -336,7 +352,10 @@ SliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSet
 	  m_in_globalEta.push_back(tsosGP.eta());
 
 	  float gemEta = +99.0, gemPhi = +99.0;
-
+	  float in_x, in_y, in_gemx, in_gemy, in_pullx, in_pully, in_resx, in_resy;
+	  in_x = tsosGP.x();
+	  in_y = tsosGP.y();
+	  int firstStrip = -1, nStrips = -1;
 	  
 	  for (auto ch : GEMGeometry_->chambers()) {
 	    for(auto roll : ch->etaPartitions()) {
@@ -352,6 +371,20 @@ SliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSet
 		if (fabs(gemGlob.phi() - tsosGP.phi()) < gemPhi) {
 		  gemPhi = gemGlob.phi();
 		  gemEta = gemGlob.eta();
+		  in_gemx = gemGlob.x();
+		  in_gemy = gemGlob.y();
+		  firstStrip = hit->firstClusterStrip();
+		  nStrips = hit->clusterSize();
+		  LocalPoint && tsos_localpos = tsos.localPosition();
+		  LocalError && tsos_localerr = tsos.localError().positionError();
+		  LocalPoint && dethit_localpos = hit->localPosition();     
+		  LocalError && dethit_localerr = hit->localPositionError();
+		  in_resx = (dethit_localpos.x() - tsos_localpos.x());
+		  in_resy = (dethit_localpos.y() - tsos_localpos.y()); 
+		  in_pullx = (dethit_localpos.x() - tsos_localpos.x()) / 
+		    std::sqrt(dethit_localerr.xx() + tsos_localerr.xx());
+		  in_pully = (dethit_localpos.y() - tsos_localpos.y()) / 
+		    std::sqrt(dethit_localerr.yy() + tsos_localerr.yy());
 		}
 		
 		// h_hitEta[rId.chamber()][rId.layer()]->Fill(rId.roll());
@@ -363,7 +396,9 @@ SliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSet
 	  }
 	  m_in_nearGemPhi.push_back(gemPhi);
 	  m_in_nearGemEta.push_back(gemEta);
-
+	  m_in_nearGemFirstStrip.push_back(firstStrip);
+	  m_in_nearGemNStrips.push_back(nStrips);
+	  m_in_x.push_back(in_x); m_in_y.push_back(in_y); m_in_gemx.push_back(in_gemx); m_in_gemy.push_back(in_gemy); m_in_pullx.push_back(in_pullx); m_in_pully.push_back(in_pully); m_in_resx.push_back(in_resx); m_in_resy.push_back(in_resy);
 	  
 	  for (auto hit = muonTrack->recHitsBegin(); hit != muonTrack->recHitsEnd(); hit++) {
 	    if ((*hit)->geographicalId().det() == 2 && (*hit)->geographicalId().subdetId() == 4) {
