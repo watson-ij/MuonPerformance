@@ -14,7 +14,7 @@ process.GlobalTag = GlobalTag(process.GlobalTag, '102X_dataRun2_Prompt_v1', '')
 process.MessageLogger.cerr.FwkReport.reportEvery = 5000
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(100)
+    input = cms.untracked.int32(-1)
 )
 #process.maxEvents.input = cms.untracked.int32(10)
 # Input source

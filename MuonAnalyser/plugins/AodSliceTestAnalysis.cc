@@ -323,6 +323,8 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
   nMuonTotal += b_nMuons;
   nGEMTotal += b_nGEMHits;
+
+  t_event->Fill();
 }
 
 void AodSliceTestAnalysis::beginJob(){}
