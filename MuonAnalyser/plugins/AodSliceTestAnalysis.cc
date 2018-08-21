@@ -130,6 +130,8 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_event->Branch("lumi", &b_lumi, "lumi/I");
 
   t_muon = fs->make<TTree>("Muon", "Muon");
+  t_muon->Branch("run", &b_run, "run/I");
+  t_muon->Branch("lumi", &b_lumi, "lumi/I");
   t_muon->Branch("nhits", &m_nhits, "nhits/I")->SetTitle("n GEM hits associated to muon");
   t_muon->Branch("nvalidhits", &m_nvalidhits, "nvalidhits/I")->SetTitle("n GEM hits associated to muon, and muon can propagate to eta partition of hit");
   t_muon->Branch("nbounds", &m_nbounds, "nbounds/I")->SetTitle("times muon is in GEM eta partition bounds");
@@ -252,6 +254,8 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	  float in_x, in_y;
 	  in_x = tsosGP.x(); in_y = tsosGP.y();
 	  m_in_x.push_back(in_x); m_in_y.push_back(in_y);
+	  m_in_globalPhi.push_back(tsosGP.phi());
+	  m_in_globalEta.push_back(tsosGP.eta());
 
 	  bool matchingGem = false;
 	  int nstrips = -1, firststrip = -1;
@@ -267,6 +271,7 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	      matchingGem = true;
 	      firststrip = hit->firstClusterStrip();
 	      nstrips = hit->clusterSize();
+	      gemPhi = gemGlob.phi(); gemEta = gemGlob.eta();
 
 	      LocalPoint && tsos_localpos = tsos.localPosition();
 	      LocalError && tsos_localerr = tsos.localError().positionError();
@@ -285,6 +290,7 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	  m_in_pullx.push_back(in_pullx); m_in_pully.push_back(in_pully);
 	  m_in_gemNStrips.push_back(nstrips); m_in_gemFirstStrip.push_back(firststrip);
 	  m_in_matchingGem.push_back(matchingGem);
+	  m_in_nearGemPhi.push_back(gemPhi); m_in_nearGemEta.push_back(gemEta);
 	}
       }
     }
