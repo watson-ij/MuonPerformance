@@ -146,9 +146,6 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("in_resy", &m_in_resy);
   t_muon->Branch("in_pullx", &m_in_pullx);
   t_muon->Branch("in_pully", &m_in_pully);
-  t_muon->Branch("in_roll", &m_in_roll);
-  t_muon->Branch("in_chamber", &m_in_chamber);
-  t_muon->Branch("in_layer", &m_in_layer);
   t_muon->Branch("in_phi", &m_in_globalPhi);
   t_muon->Branch("in_eta", &m_in_globalEta);
   t_muon->Branch("in_nearGemPhi", &m_in_nearGemPhi);
@@ -216,15 +213,15 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
   for (auto & mu : *muons) {
     b_nMuons++;
-    m_in_roll.clear();
-    m_in_chamber.clear();
-    m_in_layer.clear();
     m_nhits = 0;
     m_nbounds = 0;
+    m_in_roll.clear(); m_in_chamber.clear(); m_in_layer.clear();
     m_in_x.clear(); m_in_y.clear(); m_in_gemx.clear(); m_in_gemy.clear();
     m_in_resx.clear(); m_in_resy.clear(); m_in_pullx.clear(); m_in_pully.clear();
     m_in_matchingGem.clear();
     m_in_gemFirstStrip.clear(); m_in_gemNStrips.clear();
+    m_in_nearGemPhi.clear(); m_in_nearGemEta.clear();
+    m_in_globalPhi.clear(); m_in_globalEta.clear();
     
     if (mu.passed(reco::Muon::Selector::CutBasedIdTight)) m_quality = 2;
     else if (mu.passed(reco::Muon::Selector::CutBasedIdLoose)) m_quality = 1;
