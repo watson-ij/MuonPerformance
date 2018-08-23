@@ -211,8 +211,13 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   b_run = iEvent.run();
   b_lumi = iEvent.luminosityBlock();
 
+  //  cout << "---- MUONS --- " << endl;
   for (auto & mu : *muons) {
     b_nMuons++;
+    // only consider muons going in the right direction (toward the gem slice test)
+    if (mu.eta() > 0) continue;
+
+    
     m_nhits = 0;
     m_nbounds = 0;
     m_in_roll.clear(); m_in_chamber.clear(); m_in_layer.clear();
@@ -231,6 +236,7 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     if (mu.globalTrack().isNonnull()) muonTrack = mu.globalTrack().get();
     else if (mu.outerTrack().isNonnull()) muonTrack = mu.outerTrack().get();
     if (muonTrack) {
+      bool fidMu = false;
       reco::TransientTrack ttTrack = ttrackBuilder_->build(muonTrack);
       for (auto ch : GEMGeometry_->etaPartitions()) {
 	TrajectoryStateOnSurface tsos = propagator->propagate(ttTrack.outermostMeasurementState(),
@@ -242,6 +248,7 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	const BoundPlane& bps(ch->surface());
 
 	if (bps.bounds().inside(pos2D)) {
+	  fidMu = true;
 	  m_nbounds++;
 	  
 	  auto gemid = ch->id();
@@ -288,8 +295,10 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	  m_in_gemNStrips.push_back(nstrips); m_in_gemFirstStrip.push_back(firststrip);
 	  m_in_matchingGem.push_back(matchingGem);
 	  m_in_nearGemPhi.push_back(gemPhi); m_in_nearGemEta.push_back(gemEta);
+	  // cout << "   --- eta: " << tsosGP.eta() << " phi: " << tsosGP.phi()  << " xyz: " << in_x << " " << in_y << " GEMxyz: " << in_gemx << " " << in_gemy << " qual:" << m_quality << " eta:" << mu.eta() << " phi:" << mu.phi() << " pt:" << mu.pt() << " ch:" << gemid.chamber() << " l:" << gemid.layer() << " p:" << gemid.roll() << endl;
 	}
       }
+      if (fidMu) ++nGEMFiducialMuon;
     }
 
     if (m_nhits > 0 or m_nbounds > 0) {
@@ -300,6 +309,8 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     }
   } // Muon Loop
 
+
+  //  cout << "--- GEM HITS ---" << endl;
   for (auto & gem : *gemRecHits) {
     ++b_nGEMHits;
     auto detId = gem.gemId();
@@ -322,7 +333,10 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     b_z = globalPosition.z();
     
     t_hit->Fill();
+
+    //    cout << "   --- eta: " << globalPosition.eta() << " phi: " << globalPosition.phi()  << " xyz: " << b_x << " " << b_y << " " << b_z << " ch:" << detId.chamber() << " l:" << detId.layer() << " p:" << detId.roll() << endl;
   } // GEM Loop
+  //  cout << endl << endl;
 
   nMuonTotal += b_nMuons;
   nGEMTotal += b_nGEMHits;
