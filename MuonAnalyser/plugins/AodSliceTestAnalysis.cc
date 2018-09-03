@@ -26,6 +26,8 @@
 #include "MagneticField/Engine/interface/MagneticField.h"
 
 #include "DataFormats/Scalers/interface/LumiScalers.h"
+#include "DataFormats/MuonData/interface/MuonDigiCollection.h"
+#include "DataFormats/GEMDigi/interface/GEMAMCStatusDigi.h"
 
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
@@ -78,10 +80,12 @@ private:
   edm::ESHandle<TransientTrackBuilder> ttrackBuilder_;
   edm::ESHandle<MagneticField> bField_;
   edm::EDGetTokenT<LumiScalersCollection> lumiScalers_;
+  edm::EDGetTokenT<MuonDigiCollection<unsigned short,GEMAMCStatusDigi>> gemDigis_;
   
   int b_run, b_lumi, b_event;
   float b_instLumi;
   int b_firstStrip, b_nStrips, b_chamber, b_layer, b_etaPartition, b_muonQuality, b_bx;
+  int b_latency;
   vector<int> b_strips;
   float b_x, b_y, b_z;
   float b_mu_eta, b_mu_phi, b_mu_pt;
@@ -126,6 +130,7 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   edm::ParameterSet serviceParameters = iConfig.getParameter<edm::ParameterSet>("ServiceParameters");
   theService_ = new MuonServiceProxy(serviceParameters);
   lumiScalers_ = consumes<LumiScalersCollection>(iConfig.getParameter<edm::InputTag>("lumiScalers"));
+  gemDigis_ = consumes<MuonDigiCollection<unsigned short,GEMAMCStatusDigi>>(iConfig.getParameter<edm::InputTag>("gemDigis"));
   
   t_event = fs->make<TTree>("Event", "Event");
   t_event->Branch("nMuons", &b_nMuons, "nMuons/I");
@@ -134,11 +139,13 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_event->Branch("run", &b_run, "run/I");
   t_event->Branch("lumi", &b_lumi, "lumi/I");
   t_event->Branch("instLumi", &b_instLumi, "instLumi/F");
+  t_event->Branch("latency", &b_latency, "latency/I");
 
   t_muon = fs->make<TTree>("Muon", "Muon");
   t_muon->Branch("run", &b_run, "run/I");
   t_muon->Branch("lumi", &b_lumi, "lumi/I");
   t_muon->Branch("instLumi", &b_instLumi, "instLumi/F");
+  t_muon->Branch("latency", &b_latency, "latency/I");
   t_muon->Branch("nhits", &m_nhits, "nhits/I")->SetTitle("n GEM hits associated to muon");
   t_muon->Branch("nvalidhits", &m_nvalidhits, "nvalidhits/I")->SetTitle("n GEM hits associated to muon, and muon can propagate to eta partition of hit");
   t_muon->Branch("nbounds", &m_nbounds, "nbounds/I")->SetTitle("times muon is in GEM eta partition bounds");
@@ -169,6 +176,7 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_hit->Branch("run", &b_run, "run/I");
   t_hit->Branch("lumi", &b_lumi, "lumi/I");
   t_hit->Branch("instLumi", &b_instLumi, "instLumi/F");
+  t_hit->Branch("latency", &b_latency, "latency/I");
   t_hit->Branch("bx", &b_bx, "bx/I");
   t_hit->Branch("firstStrip", &b_firstStrip, "firstStrip/I");
   t_hit->Branch("nStrips", &b_nStrips, "nStrips/I");
@@ -209,10 +217,20 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   Handle<View<reco::Muon> > muons;
   iEvent.getByToken(muons_, muons);
 
+  edm::Handle<MuonDigiCollection<unsigned short,GEMAMCStatusDigi>> gemDigis;
+  iEvent.getByToken(gemDigis_, gemDigis);
+
   iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", ttrackBuilder_);
   theService_->update(iSetup);
   auto propagator = theService_->propagator("SteppingHelixPropagatorAny");
 
+  b_latency = -1;
+  for (auto g : *gemDigis) {
+    for (auto a = g.second.first; a != g.second.second; ++a) {
+      b_latency = a->Param1();
+    }
+  }
+  
   nEvents++;
 
   b_nMuons = 0;
