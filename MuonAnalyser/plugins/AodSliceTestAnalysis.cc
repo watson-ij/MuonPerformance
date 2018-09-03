@@ -25,6 +25,8 @@
 #include "TrackPropagation/SteppingHelixPropagator/interface/SteppingHelixPropagator.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
 
+#include "DataFormats/Scalers/interface/LumiScalers.h"
+
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
@@ -74,9 +76,11 @@ private:
   MuonServiceProxy* theService_;
   edm::ESHandle<Propagator> propagator_;
   edm::ESHandle<TransientTrackBuilder> ttrackBuilder_;
-  edm::ESHandle<MagneticField> bField_; 
+  edm::ESHandle<MagneticField> bField_;
+  edm::EDGetTokenT<LumiScalersCollection> lumiScalers_;
   
   int b_run, b_lumi, b_event;
+  float b_instLumi;
   int b_firstStrip, b_nStrips, b_chamber, b_layer, b_etaPartition, b_muonQuality, b_bx;
   vector<int> b_strips;
   float b_x, b_y, b_z;
@@ -121,6 +125,7 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   muons_ = consumes<View<reco::Muon> >(iConfig.getParameter<InputTag>("muons"));
   edm::ParameterSet serviceParameters = iConfig.getParameter<edm::ParameterSet>("ServiceParameters");
   theService_ = new MuonServiceProxy(serviceParameters);
+  lumiScalers_ = consumes<LumiScalersCollection>(iConfig.getParameter<edm::InputTag>("lumiScalers"));
   
   t_event = fs->make<TTree>("Event", "Event");
   t_event->Branch("nMuons", &b_nMuons, "nMuons/I");
@@ -128,10 +133,12 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_event->Branch("nGEMHits", &b_nGEMHits, "nGEMHits/I");
   t_event->Branch("run", &b_run, "run/I");
   t_event->Branch("lumi", &b_lumi, "lumi/I");
+  t_event->Branch("instLumi", &b_instLumi, "instLumi/F");
 
   t_muon = fs->make<TTree>("Muon", "Muon");
   t_muon->Branch("run", &b_run, "run/I");
   t_muon->Branch("lumi", &b_lumi, "lumi/I");
+  t_muon->Branch("instLumi", &b_instLumi, "instLumi/F");
   t_muon->Branch("nhits", &m_nhits, "nhits/I")->SetTitle("n GEM hits associated to muon");
   t_muon->Branch("nvalidhits", &m_nvalidhits, "nvalidhits/I")->SetTitle("n GEM hits associated to muon, and muon can propagate to eta partition of hit");
   t_muon->Branch("nbounds", &m_nbounds, "nbounds/I")->SetTitle("times muon is in GEM eta partition bounds");
@@ -161,6 +168,7 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_hit = fs->make<TTree>("Hit", "Hit");
   t_hit->Branch("run", &b_run, "run/I");
   t_hit->Branch("lumi", &b_lumi, "lumi/I");
+  t_hit->Branch("instLumi", &b_instLumi, "instLumi/F");
   t_hit->Branch("bx", &b_bx, "bx/I");
   t_hit->Branch("firstStrip", &b_firstStrip, "firstStrip/I");
   t_hit->Branch("nStrips", &b_nStrips, "nStrips/I");
@@ -189,6 +197,9 @@ AodSliceTestAnalysis::~AodSliceTestAnalysis()
 void
 AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
+  edm::Handle<LumiScalersCollection> lumiScalers;
+  iEvent.getByToken(lumiScalers_, lumiScalers);
+
   edm::ESHandle<GEMGeometry> GEMGeometry_;
   iSetup.get<MuonGeometryRecord>().get(GEMGeometry_);
 
@@ -210,6 +221,7 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   
   b_run = iEvent.run();
   b_lumi = iEvent.luminosityBlock();
+  b_instLumi = (lumiScalers->at(0)).instantLumi();
 
   //  cout << "---- MUONS --- " << endl;
   for (auto & mu : *muons) {
