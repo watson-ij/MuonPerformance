@@ -28,6 +28,8 @@
 #include "DataFormats/Scalers/interface/LumiScalers.h"
 #include "DataFormats/MuonData/interface/MuonDigiCollection.h"
 #include "DataFormats/GEMDigi/interface/GEMAMCStatusDigi.h"
+#include "DataFormats/GEMDigi/interface/GEMVfatStatusDigi.h"
+#include "DataFormats/GEMDigi/interface/GEMGEBStatusDigi.h"
 
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
@@ -81,6 +83,8 @@ private:
   edm::ESHandle<MagneticField> bField_;
   edm::EDGetTokenT<LumiScalersCollection> lumiScalers_;
   edm::EDGetTokenT<MuonDigiCollection<unsigned short,GEMAMCStatusDigi>> gemDigis_;
+  edm::EDGetTokenT<MuonDigiCollection<unsigned short,GEMVfatStatusDigi>> vfatStatus_;
+  edm::EDGetTokenT<MuonDigiCollection<unsigned short,GEMGEBStatusDigi>> gebStatus_;
   
   int b_run, b_lumi, b_event;
   float b_instLumi;
@@ -108,7 +112,7 @@ private:
   // Propagation only information
   vector<int> m_in_roll, m_in_chamber, m_in_layer; // propagation bound info
   vector<float> m_in_globalPhi, m_in_globalEta, m_in_nearGemPhi, m_in_nearGemEta; // global info
-  vector<float> m_in_x, m_in_y, m_in_gemx, m_in_gemy, m_in_pullx, m_in_pully, m_in_resx, m_in_resy;
+  vector<float> m_in_x, m_in_y, m_in_local_x, m_in_local_y, m_in_gemx, m_in_gemy, m_in_local_gemx, m_in_local_gemy, m_in_pullx, m_in_pully, m_in_resx, m_in_resy;
   vector<int> m_in_gemNStrips, m_in_gemFirstStrip;
   vector<bool> m_in_matchingGem;
   
@@ -131,6 +135,8 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   theService_ = new MuonServiceProxy(serviceParameters);
   lumiScalers_ = consumes<LumiScalersCollection>(iConfig.getParameter<edm::InputTag>("lumiScalers"));
   gemDigis_ = consumes<MuonDigiCollection<unsigned short,GEMAMCStatusDigi>>(iConfig.getParameter<edm::InputTag>("gemDigis"));
+  vfatStatus_ = consumes<MuonDigiCollection<unsigned short,GEMVfatStatusDigi>>(iConfig.getParameter<edm::InputTag>("vfatStatus"));
+  gebStatus_ = consumes<MuonDigiCollection<unsigned short,GEMGEBStatusDigi>>(iConfig.getParameter<edm::InputTag>("gebStatus"));
   
   t_event = fs->make<TTree>("Event", "Event");
   t_event->Branch("nMuons", &b_nMuons, "nMuons/I");
@@ -166,8 +172,12 @@ AodSliceTestAnalysis::AodSliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("in_nearGemEta", &m_in_nearGemEta);
   t_muon->Branch("in_x", &m_in_x);
   t_muon->Branch("in_y", &m_in_y);
+  t_muon->Branch("in_local_x", &m_in_local_x);
+  t_muon->Branch("in_local_y", &m_in_local_y);
   t_muon->Branch("in_gemx", &m_in_gemx);
   t_muon->Branch("in_gemy", &m_in_gemy);
+  t_muon->Branch("in_local_gemx", &m_in_local_gemx);
+  t_muon->Branch("in_local_gemy", &m_in_local_gemy);
   t_muon->Branch("in_gemFirstStrip", &m_in_gemFirstStrip);
   t_muon->Branch("in_gemNStrips", &m_in_gemNStrips);
   t_muon->Branch("in_matchingGem", &m_in_matchingGem);
@@ -220,6 +230,12 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   edm::Handle<MuonDigiCollection<unsigned short,GEMAMCStatusDigi>> gemDigis;
   iEvent.getByToken(gemDigis_, gemDigis);
 
+  edm::Handle<MuonDigiCollection<unsigned short,GEMVfatStatusDigi>> vfatStatus;
+  iEvent.getByToken(vfatStatus_, vfatStatus);
+
+  edm::Handle<MuonDigiCollection<unsigned short,GEMGEBStatusDigi>> gebStatus;
+  iEvent.getByToken(gebStatus_, gebStatus);
+
   iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", ttrackBuilder_);
   theService_->update(iSetup);
   auto propagator = theService_->propagator("SteppingHelixPropagatorAny");
@@ -227,10 +243,74 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   b_latency = -1;
   for (auto g : *gemDigis) {
     for (auto a = g.second.first; a != g.second.second; ++a) {
+      continue;
+      if (a->Bstatus() == 0 && a->Tstate() == 0) continue;
+      std::cout << "AMC \n";
       b_latency = a->Param1();
+      std::cout << "  AMCnum   " << (uint64_t) a->AMCnum() << " \n";
+      std::cout << "  L1A      " << (uint64_t) a->L1A() << " \n";
+      std::cout << "  BX       " << (uint64_t) a->BX() << " \n";
+      std::cout << "  Dlength  " << (uint64_t) a->Dlength() << " \n";
+      std::cout << "  FV       " << (uint64_t) a->FV() << " \n";
+      std::cout << "  Rtype    " << (uint64_t) a->Rtype() << " \n";
+      std::cout << "  Latency  " << (uint64_t) a->Param1() << " \n";
+      std::cout << "  Onum     " << (uint64_t) a->Onum() << " \n";
+      std::cout << "  BID      " << (uint64_t) a->BID() << " \n";
+      std::cout << "  GEMDAV   " << (uint64_t) a->GEMDAV() << " \n";
+      std::cout << "  Bstatus  " << (uint64_t) a->Bstatus() << " \n";
+      std::cout << "  GDcount  " << a->GDcount() << " \n";
+      std::cout << "  Tstate   " << (uint64_t) a->Tstate() << " \n";
+      std::cout << "  ChamT    " << (uint64_t) a->ChamT() << " \n";
+      std::cout << "  OOSG     " << (uint64_t) a->OOSG() << " \n";
+      std::cout << "  CRC      " << (uint64_t) a->CRC() << " \n";
+      std::cout << "  L1AT     " << (uint64_t) a->L1AT() << " \n";
+      std::cout << "  DlengthT " << (uint64_t) a->DlengthT() << " \n";
+      std::cout << "\n";
     }
   }
-  
+
+  int vfat = 0;
+  for (auto g : *vfatStatus) {
+    for (auto a = g.second.first; a != g.second.second; ++a) {
+      continue;
+      if (a->getFlag() == 0) continue;
+      std::cout << "VfatStatus " << g.first << "\n";
+      std::cout << " " << vfat++ << std::endl;
+      std::cout << "  getLsData     " << (uint64_t) a->getLsData() << "\n";
+      std::cout << "  getMsData     " << (uint64_t) a->getMsData() <<  "\n";
+      std::cout << "  getCrc        " << (uint64_t) a->getCrc()   << "\n";
+      std::cout << "  getCrc_calc   " << (uint64_t) a->getCrc_calc() << "\n";
+      std::cout << "  getIsBlocGood " << (uint64_t) a->getIsBlocGood() << "\n";
+      std::cout << "  getB1010      " << (uint64_t) a->getB1010() <<   "\n";
+      std::cout << "  getB1100      " << (uint64_t) a->getB1100() <<   "\n";
+      std::cout << "  getB1110      " << (uint64_t) a->getB1110() <<   "\n";
+      std::cout << "  getFlag       " << (uint64_t) a->getFlag()   << "\n";
+      std::cout << "\n";
+    }
+  }
+
+  int geb = 0;
+  for (auto g : *gebStatus) {
+    for (auto a = g.second.first; a != g.second.second; ++a) {
+      continue;
+      if (a->getErrorC() == 0) continue;
+      std::cout << "gebStatus " << g.first << "\n";
+      std::cout << " " << geb++ << std::endl;
+      std::cout << "  getZeroSup    " << (uint64_t) a->getZeroSup()  <<     "\n";
+      std::cout << "  getVwh        " << (uint64_t) a->getVwh()      << "\n";
+      std::cout << "  getErrorC     " << (uint64_t) a->getErrorC()   <<    "\n";
+      std::cout << "  getOHCRC      " << (uint64_t) a->getOHCRC()    <<   "\n";
+      std::cout << "  getVwt        " << (uint64_t) a->getVwt()      << "\n";
+      std::cout << "  getInputID    " << (uint64_t) a->getInputID()  <<     "\n";
+      std::cout << "  getInFu       " << (uint64_t) a->getInFu()     <<  "\n";
+      std::cout << "  getStuckd     " << (uint64_t) a->getStuckd()   <<    "\n";
+      std::cout << "  getGEBFlags   ";
+      for (auto b : a->get_GEBflags())
+	std::cout << (uint64_t) b << ", ";
+      std::cout << "\n";
+    }      
+  }
+
   nEvents++;
 
   b_nMuons = 0;
@@ -252,6 +332,8 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     m_nbounds = 0;
     m_in_roll.clear(); m_in_chamber.clear(); m_in_layer.clear();
     m_in_x.clear(); m_in_y.clear(); m_in_gemx.clear(); m_in_gemy.clear();
+    m_in_local_gemx.clear(); m_in_local_gemy.clear();
+    m_in_local_x.clear(); m_in_local_y.clear();
     m_in_resx.clear(); m_in_resy.clear(); m_in_pullx.clear(); m_in_pully.clear();
     m_in_matchingGem.clear();
     m_in_gemFirstStrip.clear(); m_in_gemNStrips.clear();
@@ -294,14 +376,22 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	  bool matchingGem = false;
 	  int nstrips = -1, firststrip = -1;
 	  float in_resx = -99, in_resy = -99, in_pullx = -99, in_pully = -99;
-	  float gemEta = +99.0, gemPhi = +99.0, in_gemx=-999, in_gemy=-999;
+	  float gemEta = +99.0, gemPhi = +99.0, in_gemx=-999, in_gemy=-999, in_local_gemx=-999, in_local_gemy=-999, in_local_x=-999, in_local_y=-999;
 	  auto recHitsRange = gemRecHits->get(gemid);
 	  auto gemRecHit = recHitsRange.first;
+
+	  in_local_x = pos.x();
+	  in_local_y = pos.y();
+
 	  for (auto hit = gemRecHit; hit != recHitsRange.second; ++hit) {
 	    auto gemGlob = ch->toGlobal(hit->localPosition());
 	    if (fabs(gemGlob.phi() - tsosGP.phi()) < gemPhi) {
 	      in_gemx = gemGlob.x();
 	      in_gemy = gemGlob.y();
+
+	      in_local_gemx = hit->localPosition().x();
+	      in_local_gemy = hit->localPosition().y();
+	      
 	      matchingGem = true;
 	      firststrip = hit->firstClusterStrip();
 	      nstrips = hit->clusterSize();
@@ -320,6 +410,8 @@ AodSliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	    }
 	  }
 	  m_in_gemx.push_back(in_gemx); m_in_gemy.push_back(in_gemy);
+	  m_in_local_x.push_back(in_local_x); m_in_local_y.push_back(in_local_y);
+	  m_in_local_gemx.push_back(in_local_gemx); m_in_local_gemy.push_back(in_local_gemy);
 	  m_in_resx.push_back(in_resx); m_in_resy.push_back(in_resy);
 	  m_in_pullx.push_back(in_pullx); m_in_pully.push_back(in_pully);
 	  m_in_gemNStrips.push_back(nstrips); m_in_gemFirstStrip.push_back(firststrip);

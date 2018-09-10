@@ -305,6 +305,18 @@ SliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSet
       reco::TransientTrack ttTrack = ttrackBuilder_->build(muonTrack);
       bool onDet = false;
 
+      // lets look at the rec hits
+      cout << "Muon " << endl;
+      for (size_t i = 0; i < ttTrack.recHitsSize(); ++i) {
+	auto rechit = ttTrack.recHit(i);
+	auto detId = rechit->geographicalId();
+	if (detId.det() != DetId::Detector::Muon) continue;
+	if (detId.subdetId() != MuonSubdetId::CSC) continue;
+	/// From CSCDetId.h :: iendcap: 1=forward (+Z), 2=backward(-Z)
+	auto cscDetId = static_cast<CSCDetId>(detId);
+	cout << "   - " << cscDetId.chamber() << " " << cscDetId.layer() << " " << cscDetId.ring() << " " << cscDetId.station() << " " << cscDetId.endcap() << " " << dynamic_cast<const CSCSegment*>(&*rechit) << endl;
+      }
+
       // prepropagate to near the GEM region, to speedup per/etapart prop. w/o loss of generatlity
       // TrajectoryStateOnSurface tsos_ = propagator->propagate(ttTrack.outermostMeasurementState(),
       // 							    GEMGeometry_->etaPartitions()[0]->surface());
