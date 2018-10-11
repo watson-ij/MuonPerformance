@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Steps from "runTheMatrix.py -w upgrade -l 10811.0"
+
 cd /cms/scratch/iwatson/GEM/CMSSW_10_3_0_pre3_vanilla/src/GEMSimulation
 eval `scramv1 runtime -sh`
 
