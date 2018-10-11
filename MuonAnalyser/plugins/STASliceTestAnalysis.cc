@@ -32,6 +32,12 @@
 #include "DataFormats/GEMDigi/interface/GEMGEBStatusDigi.h"
 #include "EventFilter/GEMRawToDigi/interface/AMCdata.h"
 
+#include "DataFormats/MuonData/interface/MuonDigiCollection.h"
+#include "DataFormats/GEMDigi/interface/GEMAMC13EventCollection.h"
+#include "DataFormats/GEMDigi/interface/GEMAMCdataCollection.h"
+#include "DataFormats/GEMDigi/interface/GEMGEBStatusDigiCollection.h"
+#include "DataFormats/GEMDigi/interface/GEMVfatStatusDigiCollection.h"
+
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
@@ -87,9 +93,18 @@ private:
   edm::ESHandle<TransientTrackBuilder> ttrackBuilder_;
   edm::ESHandle<MagneticField> bField_;
   edm::EDGetTokenT<LumiScalersCollection> lumiScalers_;
-  edm::EDGetTokenT<MuonDigiCollection<unsigned short,gem::AMCdata>> gemDigis_;
-  // // edm::EDGetTokenT<MuonDigiCollection<GEMDetId,GEMVfatStatusDigi>> vfatStatus_;
-  // edm::EDGetTokenT<MuonDigiCollection<GEMDetId,GEMGEBStatusDigi>> gebStatus_;
+
+  edm::EDGetTokenT<GEMAMC13EventCollection> amc13Event_;
+  edm::EDGetTokenT<GEMAMCdataCollection> amcData_;
+  edm::EDGetTokenT<GEMGEBStatusDigiCollection> gebStatusCol_;
+  edm::EDGetTokenT<GEMVfatStatusDigiCollection> vfatStatusCol_;
+
+  bool checkEtaPartitionGood(const GEMEtaPartition* part);
+  
+  edm::Handle<GEMAMC13EventCollection> amc13Event;
+  edm::Handle<GEMAMCdataCollection> amcData;
+  edm::Handle<GEMGEBStatusDigiCollection> gebStatusCol;  
+  edm::Handle<GEMVfatStatusDigiCollection> vfatStatusCol;  
 
   ULong64_t b_event;
   int b_run, b_lumi;
@@ -117,7 +132,7 @@ private:
   vector<float> m_resx, m_resy, m_pullx, m_pully;
   // Propagation only information
   vector<float> m_in_vfat;
-  vector<int> m_in_roll, m_in_chamber, m_in_layer; // propagation bound info
+  vector<int> m_in_roll, m_in_chamber, m_in_layer, m_in_goodEta; // propagation bound info
   vector<float> m_in_globalPhi, m_in_globalEta, m_in_nearGemPhi, m_in_nearGemEta; // global info
   vector<float> m_in_x, m_in_y, m_in_local_x, m_in_local_y, m_in_gemx, m_in_gemy, m_in_local_gemx, m_in_local_gemy, m_in_pullx, m_in_pully, m_in_resx, m_in_resy, m_in_trkextdx, m_in_gem_dx;
   vector<float> m_in_local_x_closetsos, m_in_local_y_closetsos, m_in_trkextdx_closetsos, m_in_trkextdx_inner;
@@ -147,10 +162,11 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   edm::ParameterSet serviceParameters = iConfig.getParameter<edm::ParameterSet>("ServiceParameters");
   theService_ = new MuonServiceProxy(serviceParameters);
   lumiScalers_ = consumes<LumiScalersCollection>(iConfig.getParameter<edm::InputTag>("lumiScalers"));
-  gemDigis_ = consumes<MuonDigiCollection<unsigned short,gem::AMCdata>>(iConfig.getParameter<edm::InputTag>("gemDigis"));
-  // // vfatStatus_ = consumes<MuonDigiCollection<GEMDetId,GEMVfatStatusDigi>>(iConfig.getParameter<edm::InputTag>("vfatStatus"));
-  // gebStatus_ = consumes<MuonDigiCollection<GEMDetId,GEMGEBStatusDigi>>(iConfig.getParameter<edm::InputTag>("gebStatus"));
-
+  amc13Event_ = consumes<GEMAMC13EventCollection>(iConfig.getParameter<edm::InputTag>("amc13Event"));
+  amcData_ = consumes<GEMAMCdataCollection>(iConfig.getParameter<edm::InputTag>("amcData"));
+  gebStatusCol_ = consumes<GEMGEBStatusDigiCollection>(iConfig.getParameter<edm::InputTag>("gebStatusCol"));
+  vfatStatusCol_ = consumes<GEMVfatStatusDigiCollection>(iConfig.getParameter<edm::InputTag>("vfatStatusCol"));
+ 
   t_event = fs->make<TTree>("Event", "Event");
   t_event->Branch("nMuons", &b_nMuons, "nMuons/I");
   t_event->Branch("nMuonsWithGEMHit", &b_nMuonsWithGEMHit, "nMuonsWithGEMHit/I");
@@ -185,6 +201,7 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("in_roll", &m_in_roll);
   t_muon->Branch("in_chamber", &m_in_chamber);
   t_muon->Branch("in_layer", &m_in_layer);
+  t_muon->Branch("in_goodEta", &m_in_goodEta);
   t_muon->Branch("in_resx", &m_in_resx);
   t_muon->Branch("in_resx_tests", &m_in_resx_tests);
   t_muon->Branch("in_resy", &m_in_resy);
@@ -266,8 +283,10 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   edm::Handle<reco::TrackCollection> muons;
   iEvent.getByToken(staTracks_, muons);
 
-  edm::Handle<MuonDigiCollection<unsigned short,gem::AMCdata>> gemDigis;
-  iEvent.getByToken(gemDigis_, gemDigis);
+  iEvent.getByToken(amc13Event_, amc13Event);
+  iEvent.getByToken(amcData_, amcData);
+  iEvent.getByToken(gebStatusCol_, gebStatusCol);
+  iEvent.getByToken(vfatStatusCol_, vfatStatusCol);
 
   iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", ttrackBuilder_);
   theService_->update(iSetup);
@@ -275,7 +294,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
   b_latency = -1;
 
-  for (auto g : *gemDigis) {
+  for (auto g : *amcData) {
     for (auto a = g.second.first; a != g.second.second; ++a) {
       if (b_latency != -1 && b_latency != a->param1())
  	std::cout << "CHANGING LATENCY - old: " << b_latency << " new: " << a->param1() << std::endl;
@@ -309,7 +328,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     
     m_nGEMhits = 0;
     m_nbounds = 0;
-    m_in_strip.clear(); m_in_vfat.clear(); m_in_roll.clear(); m_in_chamber.clear(); m_in_layer.clear();
+    m_in_strip.clear(); m_in_vfat.clear(); m_in_roll.clear(); m_in_chamber.clear(); m_in_layer.clear(); m_in_goodEta.clear();
     m_in_x.clear(); m_in_y.clear(); m_in_gemx.clear(); m_in_gem_dx.clear(); m_in_gemy.clear();
     m_in_local_x_closetsos.clear(); m_in_local_y_closetsos.clear();
     m_in_local_x_inner.clear(); m_in_local_y_inner.clear(); 
@@ -361,6 +380,9 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   	  m_in_roll.push_back(gemid.roll());
   	  m_in_chamber.push_back(gemid.chamber());
   	  m_in_layer.push_back(gemid.layer());
+
+	  m_in_goodEta.push_back(checkEtaPartitionGood(ch));
+	  
   	  float in_x, in_y;
   	  in_x = tsosGP.x(); in_y = tsosGP.y();
   	  m_in_x.push_back(in_x); m_in_y.push_back(in_y);
@@ -511,6 +533,32 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   nGEMTotal += b_nGEMHits;
 
   t_event->Fill();
+}
+
+bool STASliceTestAnalysis::checkEtaPartitionGood(const GEMEtaPartition* part)
+{
+  GEMDetId rId = part->id();
+  int amcBx = -1;
+
+  for (GEMAMCdataCollection::DigiRangeIterator amcsIt = amcData->begin(); amcsIt != amcData->end(); ++amcsIt){
+    auto amcs = (*amcsIt).second;
+    for (auto amc = amcs.first; amc != amcs.second; ++amc) {
+      amcBx = amc->bx();
+    }
+  }
+  
+  auto gebs = gebStatusCol->get(rId.chamberId()); 
+  for (auto geb = gebs.first; geb != gebs.second; ++geb) {
+    if (int(geb->getInFu()) != 0 ) return false;
+  }
+  
+  auto vfats = vfatStatusCol->get(rId); 
+  for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
+    if (vfat->bc() != amcBx ) return false;
+    if (int(vfat->quality()) != 0 ) return false;
+    if (int(vfat->flag()) != 0 ) return false;
+  }
+  return true;
 }
 
 void STASliceTestAnalysis::beginJob(){}
