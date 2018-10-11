@@ -111,7 +111,7 @@ private:
   int m_nGEMhits, m_nCSChits, m_nhits, m_nvalidhits;
   int m_nbounds;
   int m_quality, m_charge;
-  float m_pt, m_eta, m_phi;
+  float m_pt, m_eta, m_phi, m_chi2;
   // GEMHits included in Muon
   vector<int> m_roll, m_chamber, m_layer; // hit info
   vector<float> m_resx, m_resy, m_pullx, m_pully;
@@ -169,6 +169,7 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("lumi", &b_lumi, "lumi/I");
   t_muon->Branch("instLumi", &b_instLumi, "instLumi/F");
   t_muon->Branch("latency", &b_latency, "latency/I");
+  t_muon->Branch("chi2", &m_chi2, "chi2/F");
   t_muon->Branch("nhits", &m_nhits, "nhits/I");
   t_muon->Branch("nCSChits", &m_nCSChits, "nCSChits/I");
   t_muon->Branch("nGEMhits", &m_nGEMhits, "nGEMhits/I")->SetTitle("n GEM hits associated to muon");
@@ -323,7 +324,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     m_in_globalPhi.clear(); m_in_globalEta.clear();
 
     m_rec_layer.clear(); m_rec_roll.clear(); m_rec_chamber.clear();
-    m_quality = 0;
+    m_quality = mu.qualityMask();
     
   //   if (mu.passed(reco::Muon::Selector::CutBasedIdTight)) m_quality = 2;
   //   else if (mu.passed(reco::Muon::Selector::CutBasedIdLoose)) m_quality = 1;
@@ -471,6 +472,8 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
       m_pt = mu.pt();
       m_eta = mu.eta();
       m_phi = mu.phi();
+      m_pt = mu.normalizedChi2();
+
       t_muon->Fill();
       b_nMuonsInMuonTree++;
     }

@@ -1,0 +1,10 @@
+# Job description file for condor job 2018Cv6v2
+executable = step1_on_condor.sh
+universe   = vanilla
+arguments  = $(Process)
+
+log = condor.log
+
+getenv     = True
+should_transfer_files = NO
+queue 2
