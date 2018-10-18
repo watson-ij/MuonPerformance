@@ -116,6 +116,8 @@ private:
   float b_mu_eta, b_mu_phi, b_mu_pt;
   float b_pull_x, b_pull_y, b_res_x, b_res_y;
 
+  int b_amcBx;
+
   int nEvents, nMuonTotal, nGEMFiducialMuon, nGEMTrackWithMuon, nGEMTotal;
   int b_nMuons, b_nMuonsWithGEMHit, b_nMuonsInMuonTree, b_nHitsInHitTree;
   int b_valid;
@@ -123,7 +125,8 @@ private:
   int b_nGEMHits;
 
   // muon branches
-  int m_nGEMhits, m_nCSChits, m_nhits, m_nvalidhits;
+  int m_nGEMhits, m_nCSChits, m_nhits, m_nvalidhits, m_nDThits, m_nRPChits, m_nLosthits, m_nBadhits;
+  float m_innerHitPos_x, m_innerHitPos_y, m_innerHitPos_z;
   int m_nbounds;
   int m_quality, m_charge;
   float m_pt, m_eta, m_phi, m_chi2;
@@ -138,11 +141,17 @@ private:
   vector<float> m_in_local_x_closetsos, m_in_local_y_closetsos, m_in_trkextdx_closetsos, m_in_trkextdx_inner;
   vector<float> m_in_local_x_inner, m_in_local_y_inner;
   vector<int> m_in_gemNStrips, m_in_gemFirstStrip, m_in_strip;
-  vector<bool> m_in_matchingGem;
+  vector<bool> m_in_matchingGem, m_in_GebFu, m_in_IsGeb;
+  vector<int> m_in_VfatQual, m_in_VfatFlag, m_in_VfatBc, m_in_nvfat, m_in_errorc, m_in_stuckd;
 
   vector<int> m_rec_roll, m_rec_chamber, m_rec_layer;
 
   vector<vector<float>> m_in_resx_tests;
+
+  // GEM RecHit additional info about quality
+  bool b_gebFu = false, b_isGeb = false;
+  int b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
+
   
   TTree *t_hit;
   TTree *t_run;
@@ -178,6 +187,7 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_event->Branch("lumi", &b_lumi, "lumi/I");
   t_event->Branch("instLumi", &b_instLumi, "instLumi/F");
   t_event->Branch("latency", &b_latency, "latency/I");
+  t_event->Branch("amcBx", &b_amcBx, "amcBx/I");
 
   t_muon = fs->make<TTree>("Muon", "Muon");
   t_muon->Branch("event", &b_event, "event/l");
@@ -185,9 +195,17 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("lumi", &b_lumi, "lumi/I");
   t_muon->Branch("instLumi", &b_instLumi, "instLumi/F");
   t_muon->Branch("latency", &b_latency, "latency/I");
+  t_muon->Branch("amcBx", &b_amcBx, "amcBx/I");
   t_muon->Branch("chi2", &m_chi2, "chi2/F");
+  t_muon->Branch("innerHitPos_x", &m_innerHitPos_x, "innerHitPos_x/F");
+  t_muon->Branch("innerHitPos_y", &m_innerHitPos_y, "innerHitPos_y/F");
+  t_muon->Branch("innerHitPos_z", &m_innerHitPos_z, "innerHit_z/F");
   t_muon->Branch("nhits", &m_nhits, "nhits/I");
+  t_muon->Branch("nLosthits", &m_nLosthits, "nLosthits/I");
+  t_muon->Branch("nBadhits", &m_nBadhits, "nBadhits/I");
   t_muon->Branch("nCSChits", &m_nCSChits, "nCSChits/I");
+  t_muon->Branch("nRPChits", &m_nRPChits, "nRPChits/I");
+  t_muon->Branch("nDThits", &m_nDThits, "nDThits/I");
   t_muon->Branch("nGEMhits", &m_nGEMhits, "nGEMhits/I")->SetTitle("n GEM hits associated to muon");
   t_muon->Branch("nvalidhits", &m_nvalidhits, "nvalidhits/I")->SetTitle("n GEM hits associated to muon, and muon can propagate to eta partition of hit");
   t_muon->Branch("nbounds", &m_nbounds, "nbounds/I")->SetTitle("times muon is in GEM eta partition bounds");
@@ -232,6 +250,14 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("in_gemFirstStrip", &m_in_gemFirstStrip);
   t_muon->Branch("in_gemNStrips", &m_in_gemNStrips);
   t_muon->Branch("in_matchingGem", &m_in_matchingGem);
+  t_muon->Branch("in_IsGeb", &m_in_IsGeb);
+  t_muon->Branch("in_GebFu", &m_in_GebFu);
+  t_muon->Branch("in_stuckd", &m_in_stuckd);
+  t_muon->Branch("in_errorc", &m_in_errorc);
+  t_muon->Branch("in_NVfat", &m_in_nvfat);
+  t_muon->Branch("in_VfatQual", &m_in_VfatQual)->SetTitle("Counts number of *good* Vfat in partition by quality flag");
+  t_muon->Branch("in_VfatFlag", &m_in_VfatFlag);
+  t_muon->Branch("in_VfatBc", &m_in_VfatBc)->SetTitle("Counts number of *good* Vfat in partition by asking if BC is equal to AMC BC");
 
   t_muon->Branch("rec_roll", &m_rec_roll);
   t_muon->Branch("rec_chamber", &m_rec_chamber);
@@ -254,6 +280,18 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_hit->Branch("x", &b_x, "x/F");
   t_hit->Branch("y", &b_y, "y/F");
   t_hit->Branch("z", &b_z, "z/F");
+
+  t_hit->Branch("gebFu", b_gebFu, "gebFu/O");
+  t_hit->Branch("isGeb", b_isGeb, "isGeb/O");
+  
+  t_hit->Branch("vfatQual", b_vfatQual, "vfatQual/I");
+  t_hit->Branch("vfatFlag", b_vfatFlag, "vfatFlag/I");
+  t_hit->Branch("vfatBc", b_vfatBc, "vfatBc/I");
+  t_hit->Branch("nvfat", b_nvfat, "nvfat/I");
+  t_hit->Branch("stuckd", b_stuckd, "stuckd/I");
+  t_hit->Branch("errorc", b_errorc, "errorc/I");
+  
+
 }
 
 STASliceTestAnalysis::~STASliceTestAnalysis()
@@ -294,8 +332,10 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
   b_latency = -1;
 
+  b_amcBx = -99;
   for (auto g : *amcData) {
     for (auto a = g.second.first; a != g.second.second; ++a) {
+      b_amcBx = a->bx();
       if (b_latency != -1 && b_latency != a->param1())
  	std::cout << "CHANGING LATENCY - old: " << b_latency << " new: " << a->param1() << std::endl;
       b_latency = a->param1();
@@ -337,7 +377,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     m_in_local_x.clear(); m_in_local_y.clear();
     m_in_resx.clear(); m_in_trkextdx.clear(); m_in_resy.clear(); m_in_pullx.clear(); m_in_pully.clear();
     m_in_resx_tests.clear();
-    m_in_matchingGem.clear();
+    m_in_matchingGem.clear(); m_in_GebFu.clear(); m_in_IsGeb.clear(); m_in_nvfat.clear(); m_in_VfatQual.clear(); m_in_VfatFlag.clear(); m_in_VfatBc.clear();
     m_in_gemFirstStrip.clear(); m_in_gemNStrips.clear();
     m_in_nearGemPhi.clear(); m_in_nearGemEta.clear();
     m_in_globalPhi.clear(); m_in_globalEta.clear();
@@ -359,7 +399,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
       reco::TransientTrack ttTrack = ttrackBuilder_->build(muonTrack);
       for (auto ch : GEMGeometry_->etaPartitions()) {
 
-  	TrajectoryStateOnSurface tsos = propagator->propagate(ttTrack.outermostMeasurementState(),
+  	TrajectoryStateOnSurface tsos = propagator->propagate(ttTrack.innermostMeasurementState(),
   							      ch->surface());
   	if (!tsos.isValid()) continue;
 
@@ -427,6 +467,25 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
   	  LocalPoint loc;
 
+	  // check quality of chamber
+	  bool gebFu = false, isGeb = false;
+	  int vfatQual = 0, vfatFlag = 0, vfatBc = 0, nvfat = 0, stuckd = -99, errorc = -99;
+	  auto gebs = gebStatusCol->get(gemid.chamberId()); 
+	  for (auto geb = gebs.first; geb != gebs.second; ++geb) {
+	    isGeb = true;
+	    if (int(geb->getInFu()) != 0) gebFu = false;
+	    else gebFu = true;
+	    stuckd = geb->getStuckd();
+	    errorc = geb->getErrorC();
+	  }
+	  auto vfats = vfatStatusCol->get(gemid); 
+	  for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
+	    nvfat++;
+	    if (vfat->bc() == b_amcBx) vfatBc++;
+	    if (int(vfat->quality()) == 0) vfatQual++;
+	    if (int(vfat->flag()) == 0) vfatFlag++;
+	  }
+	  
   	  for (auto hit = gemRecHit; hit != recHitsRange.second; ++hit) {
   	    auto gemGlob = ch->toGlobal(hit->localPosition());
   	    if (fabs(gemGlob.phi() - tsosGP.phi()) < gemPhi) {
@@ -466,26 +525,33 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   	  m_in_pullx.push_back(in_pullx); m_in_pully.push_back(in_pully);
   	  m_in_gemNStrips.push_back(nstrips); m_in_gemFirstStrip.push_back(firststrip);
   	  m_in_matchingGem.push_back(matchingGem);
+	  m_in_GebFu.push_back(gebFu); m_in_IsGeb.push_back(isGeb); m_in_errorc.push_back(errorc); m_in_stuckd.push_back(stuckd);
+	  m_in_nvfat.push_back(nvfat); m_in_VfatQual.push_back(vfatQual); m_in_VfatFlag.push_back(vfatFlag); m_in_VfatBc.push_back(vfatBc);
   	  m_in_nearGemPhi.push_back(gemPhi); m_in_nearGemEta.push_back(gemEta);
+
   	  // cout << "   --- eta: " << tsosGP.eta() << " phi: " << tsosGP.phi()  << " xyz: " << in_x << " " << in_y << " GEMxyz: " << in_gemx << " " << in_gemy << " qual:" << m_quality << " eta:" << mu.eta() << " phi:" << mu.phi() << " pt:" << mu.pt() << " ch:" << gemid.chamber() << " l:" << gemid.layer() << " p:" << gemid.roll() << endl;
   	}
       }
 
-      m_nhits = 0; m_nCSChits = 0;
-      for (auto hit = muonTrack->recHitsBegin(); hit != muonTrack->recHitsEnd(); hit++) {
-	m_nhits++;
-	if ((*hit)->geographicalId().det() == DetId::Muon &&
-  	    (*hit)->geographicalId().subdetId() == MuonSubdetId::CSC) m_nCSChits++;
-	
-  	if ((*hit)->geographicalId().det() == DetId::Muon &&
-  	    (*hit)->geographicalId().subdetId() == MuonSubdetId::GEM) {
-  	  GEMDetId gemid((*hit)->geographicalId());
+      // int numberOfMuonHits() const;             // not-null, muon
+      // int numberOfValidMuonHits() const;        // not-null, valid, muon
+      // int numberOfValidMuonDTHits() const;      // not-null, valid, muon DT
+      // int numberOfValidMuonCSCHits() const;     // not-null, valid, muon CSC
+      // int numberOfValidMuonRPCHits() const;     // not-null, valid, muon RPC
+      // int numberOfValidMuonGEMHits() const;     // not-null, valid, muon GEM
+      // int numberOfValidMuonME0Hits() const;     // not-null, valid, muon ME0
 
-  	  m_rec_chamber.push_back(gemid.chamber());
-  	  m_rec_layer.push_back(gemid.layer());
-  	  m_rec_roll.push_back(gemid.roll());
-  	}
-      }
+      m_nhits = mu.hitPattern().numberOfValidMuonHits();
+      m_nCSChits = mu.hitPattern().numberOfValidMuonCSCHits();
+      m_nRPChits = mu.hitPattern().numberOfValidMuonRPCHits();
+      m_nDThits = mu.hitPattern().numberOfValidMuonDTHits();
+      m_nLosthits = mu.hitPattern().numberOfLostMuonHits();
+      m_nBadhits = mu.hitPattern().numberOfBadMuonHits();
+      m_innerHitPos_x = mu.innerPosition().x();
+      m_innerHitPos_y = mu.innerPosition().y();
+      m_innerHitPos_z = mu.innerPosition().z();
+      
+      if (m_nGEMhits != mu.hitPattern().numberOfValidMuonGEMHits()) std::cout << "WOOPS GEM! " << std::endl;
 
       if (fidMu) ++nGEMFiducialMuon;
     }
@@ -494,7 +560,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
       m_pt = mu.pt();
       m_eta = mu.eta();
       m_phi = mu.phi();
-      m_pt = mu.normalizedChi2();
+      m_chi2 = mu.normalizedChi2();
 
       t_muon->Fill();
       b_nMuonsInMuonTree++;
@@ -526,6 +592,24 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     t_hit->Fill();
     b_nHitsInHitTree++;
     //    cout << "   --- eta: " << globalPosition.eta() << " phi: " << globalPosition.phi()  << " xyz: " << b_x << " " << b_y << " " << b_z << " ch:" << detId.chamber() << " l:" << detId.layer() << " p:" << detId.roll() << endl;
+
+    b_gebFu = false, b_isGeb = false;
+    b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
+    auto gebs = gebStatusCol->get(detId); 
+    for (auto geb = gebs.first; geb != gebs.second; ++geb) {
+      b_isGeb = true;
+      if (int(geb->getInFu()) != 0) b_gebFu = false;
+      else b_gebFu = true;
+      b_stuckd = geb->getStuckd();
+      b_errorc = geb->getErrorC();
+    }
+    auto vfats = vfatStatusCol->get(detId); 
+    for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
+      b_nvfat++;
+      if (vfat->bc() == b_amcBx) b_vfatBc++;
+      if (int(vfat->quality()) == 0) b_vfatQual++;
+      if (int(vfat->flag()) == 0) b_vfatFlag++;
+    }
   } // GEM Loop
   //  cout << endl << endl;
 
