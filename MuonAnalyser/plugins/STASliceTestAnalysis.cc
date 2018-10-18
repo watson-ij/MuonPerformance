@@ -142,7 +142,7 @@ private:
   vector<float> m_in_local_x_inner, m_in_local_y_inner;
   vector<int> m_in_gemNStrips, m_in_gemFirstStrip, m_in_strip;
   vector<bool> m_in_matchingGem, m_in_GebFu, m_in_IsGeb;
-  vector<int> m_in_VfatQual, m_in_VfatFlag, m_in_VfatBc, m_in_nvfat, m_in_errorc, m_in_stuckd;
+  vector<int> m_in_VfatQual, m_in_VfatFlag, m_in_VfatBc, m_in_nvfat, m_in_errorc, m_in_stuckd, m_in_VfatDBx;
 
   vector<int> m_rec_roll, m_rec_chamber, m_rec_layer;
 
@@ -258,6 +258,7 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("in_VfatQual", &m_in_VfatQual)->SetTitle("Counts number of *good* Vfat in partition by quality flag");
   t_muon->Branch("in_VfatFlag", &m_in_VfatFlag);
   t_muon->Branch("in_VfatBc", &m_in_VfatBc)->SetTitle("Counts number of *good* Vfat in partition by asking if BC is equal to AMC BC");
+  t_muon->Branch("in_VfatDbx", &m_in_VfatDBx)->SetTitle("Sum of AMC BX - VFAT BX for partition");
 
   t_muon->Branch("rec_roll", &m_rec_roll);
   t_muon->Branch("rec_chamber", &m_rec_chamber);
@@ -281,15 +282,15 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_hit->Branch("y", &b_y, "y/F");
   t_hit->Branch("z", &b_z, "z/F");
 
-  t_hit->Branch("gebFu", b_gebFu, "gebFu/O");
-  t_hit->Branch("isGeb", b_isGeb, "isGeb/O");
+  t_hit->Branch("gebFu", &b_gebFu, "gebFu/O");
+  t_hit->Branch("isGeb", &b_isGeb, "isGeb/O");
   
-  t_hit->Branch("vfatQual", b_vfatQual, "vfatQual/I");
-  t_hit->Branch("vfatFlag", b_vfatFlag, "vfatFlag/I");
-  t_hit->Branch("vfatBc", b_vfatBc, "vfatBc/I");
-  t_hit->Branch("nvfat", b_nvfat, "nvfat/I");
-  t_hit->Branch("stuckd", b_stuckd, "stuckd/I");
-  t_hit->Branch("errorc", b_errorc, "errorc/I");
+  t_hit->Branch("vfatQual", &b_vfatQual, "vfatQual/I");
+  t_hit->Branch("vfatFlag", &b_vfatFlag, "vfatFlag/I");
+  t_hit->Branch("vfatBc", &b_vfatBc, "vfatBc/I");
+  t_hit->Branch("nvfat", &b_nvfat, "nvfat/I");
+  t_hit->Branch("stuckd", &b_stuckd, "stuckd/I");
+  t_hit->Branch("errorc", &b_errorc, "errorc/I");
   
 
 }
@@ -377,7 +378,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     m_in_local_x.clear(); m_in_local_y.clear();
     m_in_resx.clear(); m_in_trkextdx.clear(); m_in_resy.clear(); m_in_pullx.clear(); m_in_pully.clear();
     m_in_resx_tests.clear();
-    m_in_matchingGem.clear(); m_in_GebFu.clear(); m_in_IsGeb.clear(); m_in_nvfat.clear(); m_in_VfatQual.clear(); m_in_VfatFlag.clear(); m_in_VfatBc.clear();
+    m_in_matchingGem.clear(); m_in_GebFu.clear(); m_in_IsGeb.clear(); m_in_nvfat.clear(); m_in_VfatQual.clear(); m_in_VfatFlag.clear(); m_in_VfatBc.clear(); m_in_VfatDBx.clear();
     m_in_gemFirstStrip.clear(); m_in_gemNStrips.clear();
     m_in_nearGemPhi.clear(); m_in_nearGemEta.clear();
     m_in_globalPhi.clear(); m_in_globalEta.clear();
@@ -469,7 +470,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
 	  // check quality of chamber
 	  bool gebFu = false, isGeb = false;
-	  int vfatQual = 0, vfatFlag = 0, vfatBc = 0, nvfat = 0, stuckd = -99, errorc = -99;
+	  int vfatQual = 0, vfatFlag = 0, vfatBc = 0, nvfat = 0, stuckd = -99, errorc = -99, vfatdbx;
 	  auto gebs = gebStatusCol->get(gemid.chamberId()); 
 	  for (auto geb = gebs.first; geb != gebs.second; ++geb) {
 	    isGeb = true;
@@ -481,6 +482,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	  auto vfats = vfatStatusCol->get(gemid); 
 	  for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
 	    nvfat++;
+	    vfatdbx += b_amcBx - vfat->bc();
 	    if (vfat->bc() == b_amcBx) vfatBc++;
 	    if (int(vfat->quality()) == 0) vfatQual++;
 	    if (int(vfat->flag()) == 0) vfatFlag++;
@@ -526,7 +528,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   	  m_in_gemNStrips.push_back(nstrips); m_in_gemFirstStrip.push_back(firststrip);
   	  m_in_matchingGem.push_back(matchingGem);
 	  m_in_GebFu.push_back(gebFu); m_in_IsGeb.push_back(isGeb); m_in_errorc.push_back(errorc); m_in_stuckd.push_back(stuckd);
-	  m_in_nvfat.push_back(nvfat); m_in_VfatQual.push_back(vfatQual); m_in_VfatFlag.push_back(vfatFlag); m_in_VfatBc.push_back(vfatBc);
+	  m_in_nvfat.push_back(nvfat); m_in_VfatQual.push_back(vfatQual); m_in_VfatFlag.push_back(vfatFlag); m_in_VfatBc.push_back(vfatBc); m_in_VfatDBx.push_back(vfatdbx);
   	  m_in_nearGemPhi.push_back(gemPhi); m_in_nearGemEta.push_back(gemEta);
 
   	  // cout << "   --- eta: " << tsosGP.eta() << " phi: " << tsosGP.phi()  << " xyz: " << in_x << " " << in_y << " GEMxyz: " << in_gemx << " " << in_gemy << " qual:" << m_quality << " eta:" << mu.eta() << " phi:" << mu.phi() << " pt:" << mu.pt() << " ch:" << gemid.chamber() << " l:" << gemid.layer() << " p:" << gemid.roll() << endl;
@@ -589,9 +591,6 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     b_y = globalPosition.y();
     b_z = globalPosition.z();
     
-    t_hit->Fill();
-    b_nHitsInHitTree++;
-    //    cout << "   --- eta: " << globalPosition.eta() << " phi: " << globalPosition.phi()  << " xyz: " << b_x << " " << b_y << " " << b_z << " ch:" << detId.chamber() << " l:" << detId.layer() << " p:" << detId.roll() << endl;
 
     b_gebFu = false, b_isGeb = false;
     b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
@@ -610,6 +609,10 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
       if (int(vfat->quality()) == 0) b_vfatQual++;
       if (int(vfat->flag()) == 0) b_vfatFlag++;
     }
+
+    t_hit->Fill();
+    b_nHitsInHitTree++;
+    //    cout << "   --- eta: " << globalPosition.eta() << " phi: " << globalPosition.phi()  << " xyz: " << b_x << " " << b_y << " " << b_z << " ch:" << detId.chamber() << " l:" << detId.layer() << " p:" << detId.roll() << endl;
   } // GEM Loop
   //  cout << endl << endl;
 
