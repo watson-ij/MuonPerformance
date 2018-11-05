@@ -140,6 +140,14 @@ private:
       vector<float> in_globalPhi, in_globalEta, in_nearGemPhi, in_nearGemEta; // global info
       vector<float> in_x, in_y, in_local_x, in_local_y, in_gemx, in_gemy, in_local_gemx, in_local_gemy, in_pullx, in_pully, in_resx, in_resy, in_trkextdx, in_gem_dx;
       vector<float> in_local_x_closetsos, in_local_y_closetsos, in_trkextdx_closetsos, in_trkextdx_inner;
+
+      vector<float> rec_x, rec_y;
+      vector<float> rec_gem_dx;
+      vector<float> rec_resx;
+      vector<float> rec_trkextdx;
+      vector<float> rec_resy;
+      vector<float> rec_pullx;
+      vector<float> rec_pully;
     } m_f;
     vector<float> m_fs[(sizeof(m_f))/(sizeof(vector<float>))];
   };
@@ -161,7 +169,6 @@ private:
   // GEM RecHit additional info about quality
   bool b_gebFu = false, b_isGeb = false;
   int b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
-
   
   TTree *t_hit;
   TTree *t_run;
@@ -282,6 +289,14 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("rec_roll", &m_i.rec_roll);
   t_muon->Branch("rec_chamber", &m_i.rec_chamber);
   t_muon->Branch("rec_layer", &m_i.rec_layer);
+  t_muon->Branch("rec_resx", &m_f.rec_resx);
+  t_muon->Branch("rec_resy", &m_f.rec_resy);
+  t_muon->Branch("rec_trkextdx", &m_f.rec_trkextdx);
+  t_muon->Branch("rec_pullx", &m_f.rec_pullx);
+  t_muon->Branch("rec_pully", &m_f.rec_pully);
+  t_muon->Branch("rec_gem_dx", &m_f.rec_gem_dx);
+  t_muon->Branch("rec_x", &m_f.rec_x);
+  t_muon->Branch("rec_y", &m_f.rec_y);
   
   t_hit = fs->make<TTree>("Hit", "Hit");
   t_hit->Branch("event", &b_event, "event/l");
@@ -310,8 +325,6 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_hit->Branch("nvfat", &b_nvfat, "nvfat/I");
   t_hit->Branch("stuckd", &b_stuckd, "stuckd/I");
   t_hit->Branch("errorc", &b_errorc, "errorc/I");
-  
-
 }
 
 STASliceTestAnalysis::~STASliceTestAnalysis()
@@ -473,7 +486,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	  // check quality of chamber
 	  bool gebFu = false, isGeb = false;
 	  int vfatQual = 0, vfatFlag = 0, vfatBc = 0, nvfat = 0, stuckd = -99, errorc = -99, vfatdbx, bx;
-	  auto gebs = gebStatusCol->get(gemid.chamberId()); 
+	  auto gebs = gebStatusCol->get(gemid.chamberId());
 	  for (auto geb = gebs.first; geb != gebs.second; ++geb) {
 	    isGeb = true;
 	    if (int(geb->getInFu()) != 0) gebFu = false;
@@ -557,22 +570,47 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
       m_innerHitPos_x = mu.innerPosition().x();
       m_innerHitPos_y = mu.innerPosition().y();
       m_innerHitPos_z = mu.innerPosition().z();
-      
- //      if (m_nGEMhits != mu.hitPattern().numberOfValidMuonGEMHits()) {
- // 	std::cout << "WOOPS GEM! " << m_nGEMhits << " valid: " << mu.hitPattern().numberOfValidMuonGEMHits() << " lost: " << mu.hitPattern().numberOfLostMuonGEMHits() << " bad: " << mu.hitPattern().numberOfBadMuonGEMHits() << " ";
- // 	for (auto hit = mu.recHitsBegin(); hit != mu.recHitsEnd(); ++hit) {
- // 	  if ((*hit)->geographicalId().det() == DetId::Muon &&
- // 	      (*hit)->geographicalId().subdetId() == MuonSubdetId::GEM) {
- // 	    GEMDetId id((*hit)->geographicalId());
- // 	    std::cout << "G:" << id.layer() << ":" << id.chamber() << "/" << id.roll() << " ";
- // 	    std::cout << "[" << (*hit)->localPosition().x() << "," << (*hit)->localPosition().y() << "] ";
- // // std::cout << "(" << (*hit)->globalPosition().x() << "," << (*hit)->globalPosition().y() << "," << (*hit)->globalPosition().z() << ") ";
- // 	  }
- // 	}
- // 	std::cout << std::endl;
- //      }
- //      else if (m_nGEMhits > 0) std::cout << "NOT woops gem " << m_nGEMhits << std::endl;
 
+      for (auto hit = mu.recHitsBegin(); hit != mu.recHitsEnd(); ++hit) {
+	if ((*hit)->geographicalId().det() == DetId::Muon &&
+	    (*hit)->geographicalId().subdetId() == MuonSubdetId::GEM) {
+	  GEMDetId id((*hit)->geographicalId());
+	  m_i.rec_chamber.push_back(id.chamber());
+	  m_i.rec_layer.push_back(id.layer());
+	  m_i.rec_roll.push_back(id.roll());
+
+	  auto roll = GEMGeometry_->etaPartition(id);
+	  // if ((*hit)->det() == 0) std::cout << "oh no!" << std::endl;
+	  // TrajectoryStateOnSurface tsos = propagator->propagate(ttTrack.innermostMeasurementState(),
+	  // 							*(*hit)->surface());
+	  TrajectoryStateOnSurface tsos = propagator->propagate(ttTrack.innermostMeasurementState(), roll->surface());
+
+	  if (!tsos.isValid()) {
+	    m_f.rec_resx.push_back(100); m_f.rec_resy.push_back(100);
+	    m_f.rec_pullx.push_back(100); m_f.rec_pully.push_back(100);
+	    m_f.rec_gem_dx.push_back(100); m_f.rec_trkextdx.push_back(100);
+	    m_f.rec_y.push_back(-999); m_f.rec_x.push_back(-999);
+	  }
+
+	  m_f.rec_x.push_back(tsos.globalPosition().x());
+	  m_f.rec_y.push_back(tsos.globalPosition().y());
+	  
+	  LocalPoint && tsos_localpos = tsos.localPosition();
+	  LocalError && tsos_localerr = tsos.localError().positionError();
+	  LocalPoint && dethit_localpos = (*hit)->localPosition();
+	  LocalError && dethit_localerr = (*hit)->localPositionError();
+	  m_f.rec_gem_dx.push_back(dethit_localerr.xx());
+	  m_f.rec_resx.push_back(dethit_localpos.x() - tsos_localpos.x());
+	  m_f.rec_trkextdx.push_back(std::sqrt(tsos.localError().positionError().xx()));
+	  m_f.rec_resy.push_back(dethit_localpos.y() - tsos_localpos.y());
+	  m_f.rec_pullx.push_back((dethit_localpos.x() - tsos_localpos.x()) / 
+				  std::sqrt(dethit_localerr.xx() + tsos_localerr.xx()));
+	  m_f.rec_pully.push_back((dethit_localpos.y() - tsos_localpos.y()) / 
+				  std::sqrt(dethit_localerr.yy() + tsos_localerr.yy()));
+	}
+      }
+
+      
       if (fidMu) ++nGEMFiducialMuon;
       if (m_nGEMhits) ++nGEMTrackWithMuon;
     }
@@ -613,7 +651,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
     b_gebFu = false, b_isGeb = false;
     b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
-    auto gebs = gebStatusCol->get(detId); 
+    auto gebs = gebStatusCol->get(detId.chamberId()); 
     for (auto geb = gebs.first; geb != gebs.second; ++geb) {
       b_isGeb = true;
       if (int(geb->getInFu()) != 0) b_gebFu = false;
