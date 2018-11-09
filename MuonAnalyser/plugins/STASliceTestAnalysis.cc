@@ -130,6 +130,9 @@ private:
   int m_nbounds;
   int m_quality, m_charge;
   float m_pt, m_eta, m_phi, m_chi2;
+  float m_dxy, m_dz, m_lambda, m_dsz, m_vx, m_vy, m_vz;
+  float m_dxyError, m_dzError;
+  int m_hasCSCStation1, m_hasCSCRing1, m_hasCSCRing4;
 
   union {
     struct {
@@ -238,7 +241,22 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("eta", &m_eta, "eta/F");
   t_muon->Branch("phi", &m_phi, "phi/F");
   t_muon->Branch("charge", &m_charge, "charge/I");
+
+  t_muon->Branch("dxy", &m_dxy, "dxy/F");
+  t_muon->Branch("dz", &m_dz, "dz/F");
+  t_muon->Branch("lambda", &m_lambda, "lambda/F");
+  t_muon->Branch("dsz", &m_dsz, "dsz/F");
+  t_muon->Branch("vx", &m_vx, "vx/F");
+  t_muon->Branch("vy", &m_vy, "vy/F");
+  t_muon->Branch("vz", &m_vz, "vz/F");
+  t_muon->Branch("dxyError", &m_dxyError, "dxyError/F");
+  t_muon->Branch("dzError", &m_dzError, "dzError/F");
+  
   t_muon->Branch("quality", &m_quality, "quality/I")->SetTitle("muon quality :: 0:noid 1:looseID 2:tightID");
+  // t_muon->Branch("hasME11", &m_hasME11, "hasME11/I");
+  t_muon->Branch("hasCSCStation1", &m_hasCSCStation1, "hasCSCStation1/I");
+  t_muon->Branch("hasCSCRing1", &m_hasCSCRing1, "hasCSCRing1/I");
+  t_muon->Branch("hasCSCRing4", &m_hasCSCRing4, "hasCSCRing4/I");
   t_muon->Branch("in_strip", &m_i.in_strip);
   t_muon->Branch("in_vfat", &m_f.in_vfat);
   t_muon->Branch("in_roll", &m_i.in_roll);
@@ -411,6 +429,8 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     
     m_quality = mu.qualityMask();
     m_charge = mu.charge();
+    // m_hasME11 = 0;
+    m_hasCSCRing4 = 0; m_hasCSCRing1 = 0; m_hasCSCStation1 = 0;
 
     const reco::Track* muonTrack = &mu;
     if (muonTrack) {
@@ -620,7 +640,33 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
       m_eta = mu.eta();
       m_phi = mu.phi();
       m_chi2 = mu.normalizedChi2();
+      m_dxy = mu.dxy();
+      m_dz = mu.dz();
+      m_dxyError = mu.dxyError();
+      m_dzError = mu.dzError();
+      m_lambda = mu.lambda();
+      m_phi = mu.phi();
+      m_dsz = mu.dsz();
+      m_vx = mu.vx();
+      m_vy = mu.vy();
+      m_vz = mu.vz();
 
+      for (auto hit = mu.recHitsBegin(); hit != mu.recHitsEnd(); ++hit) {
+	if ((*hit)->geographicalId().det() == DetId::Muon &&
+	    (*hit)->geographicalId().subdetId() == MuonSubdetId::CSC) {
+  	  CSCDetId cscid = (*hit)->geographicalId();
+	  if (cscid.station() == 1) {
+	    m_hasCSCStation1 = 1;
+	    if (cscid.ring() == 1)
+	      m_hasCSCRing1 = 1;
+	    if (cscid.ring() == 4)
+	      m_hasCSCRing4 = 1;
+	  }
+	}
+      }
+
+      if ( (m_chi2 < 5) &&
+	   (fabs(m_dxy/m_dxyError) < 3))
       t_muon->Fill();
       b_nMuonsInMuonTree++;
     }
