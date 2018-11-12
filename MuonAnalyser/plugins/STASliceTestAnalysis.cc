@@ -64,6 +64,7 @@
 
 #include "TVector2.h"
 
+#include "TrackingTools/PatternTools/interface/ClosestApproachInRPhi.h"
 
 using namespace std;
 using namespace edm;
@@ -172,11 +173,17 @@ private:
   // GEM RecHit additional info about quality
   bool b_gebFu = false, b_isGeb = false;
   int b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
+
+  // dimuon
+  int d_mu1, d_mu2; /// indexes
+  float d_mass, d_pt, d_eta, d_phi; /// dimuon mass
+  float d_dca; // distance of closest approach of the two tracks
   
   TTree *t_hit;
   TTree *t_run;
   TTree *t_muon;
   TTree *t_event;
+  TTree *t_dimuon;
 };
 
 STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
@@ -215,6 +222,21 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_event->Branch("instLumi", &b_instLumi, "instLumi/F");
   t_event->Branch("latency", &b_latency, "latency/I");
   t_event->Branch("amcBx", &b_amcBx, "amcBx/I");
+
+  t_dimuon = fs->make<TTree>("DiMuon", "DiMuon");
+  t_dimuon->Branch("event", &b_event, "event/l");
+  t_dimuon->Branch("run", &b_run, "run/I");
+  t_dimuon->Branch("lumi", &b_lumi, "lumi/I");
+  t_dimuon->Branch("instLumi", &b_instLumi, "instLumi/F");
+  t_dimuon->Branch("latency", &b_latency, "latency/I");
+  t_dimuon->Branch("amcBx", &b_amcBx, "amcBx/I");
+  t_dimuon->Branch("mu1", &d_mu1, "mu1/I");
+  t_dimuon->Branch("mu2", &d_mu2, "mu2/I");
+  t_dimuon->Branch("mass", &d_mass, "mass/F");
+  t_dimuon->Branch("pt", &d_pt, "pt/F");
+  t_dimuon->Branch("eta", &d_eta, "eta/F");
+  t_dimuon->Branch("phi", &d_phi, "phi/F");
+  t_dimuon->Branch("dca", &d_dca, "dca/F");
 
   t_muon = fs->make<TTree>("Muon", "Muon");
   t_muon->Branch("event", &b_event, "event/l");
@@ -412,8 +434,17 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
  
   //  cout << "---- MUONS --- " << endl;
+  vector<TLorentzVector> mu_p;
+  vector<int> mu_charge;
+  vector<int> mu_idx;
   for (auto & mu : *muons) {
     b_nMuons++;
+
+    
+    TLorentzVector p; p.SetPtEtaPhiM(m_pt, m_eta, m_phi, 0.1056583745);
+    mu_p.push_back(p);
+    mu_charge.push_back(m_charge);
+    mu_idx.push_back(-1);
     // only consider muons going in the right direction (toward the gem slice test)
     if (mu.eta() > 0) continue;
     
@@ -667,10 +698,36 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
       if ( (m_chi2 < 5) &&
 	   (fabs(m_dxy/m_dxyError) < 3))
+	mu_idx[mu_idx.size()-1] = t_muon->GetEntries();
       t_muon->Fill();
       b_nMuonsInMuonTree++;
     }
   } // Muon Loop
+
+  for (unsigned i1 = 0; i1 < mu_p.size(); ++i1) {
+    for (unsigned i2 = i1+1; i2 < mu_p.size(); ++i2) {
+      if ((mu_idx[i1] == -1) && (mu_idx[i2] == -1)) continue;
+      if ((mu_charge[i1]*mu_charge[i2]) > 0)
+	continue;
+      d_mu1 = mu_idx[i1];
+      d_mu2 = mu_idx[i2];
+      TLorentzVector dip = (mu_p[i1]+mu_p[i2]);
+      d_mass = dip.M();
+      d_pt = dip.Pt();
+      d_eta = dip.Eta();
+      d_phi = dip.Phi();
+
+      reco::TransientTrack ttTrack1 = ttrackBuilder_->build(muons->at(i1));
+      reco::TransientTrack ttTrack2 = ttrackBuilder_->build(muons->at(i2));
+      ClosestApproachInRPhi cApp;
+      cApp.calculate(ttTrack1.impactPointState(), ttTrack2.impactPointState());
+
+      if (!cApp.status()) {d_dca=99;}
+      else {d_dca = cApp.distance();}
+      
+      t_dimuon->Fill();
+    }
+  }
 
   //  cout << "--- GEM HITS ---" << endl;
   for (auto & gem : *gemRecHits) {
