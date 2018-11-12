@@ -87,6 +87,7 @@ process.muonGEMDigis.InputLabel = cms.InputTag('rawDataRepacker')
 process.muonRPCDigis.InputLabel = cms.InputTag('rawDataRepacker')
 process.muonDTDigis.inputLabel = cms.InputTag('rawDataRepacker')
 process.muonCSCDigis.InputObjects = cms.InputTag('rawDataRepacker')
+process.scalersRawToDigi.scalersInputTag = cms.InputTag('rawDataRepacker')
 process.reconstruction_step = cms.Path(
     (process.dt1DRecHits + process.dt4DSegments + process.dt1DCosmicRecHits + process.dt4DCosmicSegments + process.csc2DRecHits + process.cscSegments + process.rpcRecHits + process.gemRecHits + process.gemSegments) *
     offlineBeamSpot*standAloneMuonSeeds*process.standAloneMuons  # *process.dump
@@ -102,7 +103,7 @@ process.SliceTestAnalysis = cms.EDAnalyzer(
     gemRecHits = cms.InputTag("gemRecHits", "", "reRECO"),
     muons = cms.InputTag("standAloneMuons", "", "reRECO"),
     vertexCollection = cms.InputTag("offlinePrimaryVertices", "", "reRECO"),
-#    lumiScalers = cms.InputTag("scalersRawToDigi", "", "reRECO"),
+    lumiScalers = cms.InputTag("scalersRawToDigi", "", "reRECO"),
     amc13Event = cms.InputTag("muonGEMDigis", "AMC13Event", "reRECO"),
     amcData = cms.InputTag("muonGEMDigis", "AMCdata", "reRECO"),
     gebStatusCol = cms.InputTag("muonGEMDigis", "gebStatus", "reRECO"),
@@ -121,8 +122,8 @@ process.SliceTestAnalysisUpdatedAtVertex = cms.EDAnalyzer(
     gebStatusCol = cms.InputTag("muonGEMDigis", "gebStatus", "reRECO"),
     vfatStatusCol = cms.InputTag("muonGEMDigis", "vfatStatus", "reRECO"), 
 )
-# process.sliceTest = cms.Path(process.SliceTestAnalysis * process.SliceTestAnalysisUpdatedAtVertex)
-process.sliceTest = cms.Path(process.SliceTestAnalysis)
+process.sliceTest = cms.Path(process.SliceTestAnalysis * process.SliceTestAnalysisUpdatedAtVertex)
+# process.sliceTest = cms.Path(process.SliceTestAnalysis)
 
 process.muonGEMDigis.unPackStatusDigis = cms.bool(True)
 # Schedule definition
