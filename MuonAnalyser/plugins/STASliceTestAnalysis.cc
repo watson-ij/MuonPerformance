@@ -161,7 +161,7 @@ private:
       vector<int> roll, chamber, layer; // hit info
       vector<int> in_roll, in_chamber, in_layer, in_goodEta; // propagation bound info
       vector<int> in_gemNStrips, in_gemFirstStrip, in_strip;
-      vector<int> in_VfatQual, in_VfatFlag, in_VfatBc, in_nvfat, in_errorc, in_stuckd, in_VfatDBx, in_bx;
+      vector<int> in_VfatQual, in_VfatFlag, in_VfatBc, in_nvfat, in_errorc, in_stuckd, in_VfatDBx, in_bx, in_ohBc;
       vector<int> rec_roll, rec_chamber, rec_layer;
       vector<int> in_matchingGem, in_GebFu, in_IsGeb;
       
@@ -172,7 +172,7 @@ private:
 
   // GEM RecHit additional info about quality
   bool b_gebFu = false, b_isGeb = false;
-  int b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
+  int b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99, b_ohBc = -99;
 
   // dimuon
   int d_mu1, d_mu2; /// indexes
@@ -325,6 +325,7 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_muon->Branch("in_VfatBc", &m_i.in_VfatBc)->SetTitle("Counts number of *good* Vfat in partition by asking if BC is equal to AMC BC");
   t_muon->Branch("in_VfatDbx", &m_i.in_VfatDBx)->SetTitle("Sum of AMC BX - VFAT BX for partition");
   t_muon->Branch("in_bx", &m_i.in_bx)->SetTitle("BX of GEM RecHit");
+  t_muon->Branch("in_ohBc", &m_i.in_ohBc)->SetTitle("BX of the GEB Optohybrid");
 
   t_muon->Branch("rec_roll", &m_i.rec_roll);
   t_muon->Branch("rec_chamber", &m_i.rec_chamber);
@@ -359,6 +360,9 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   t_hit->Branch("gebFu", &b_gebFu, "gebFu/O");
   t_hit->Branch("isGeb", &b_isGeb, "isGeb/O");
   
+  t_hit->Branch("amcBx", &b_amcBx, "amcBx/I");
+  t_hit->Branch("ohBc", &b_ohBc, "ohBc/I");
+
   t_hit->Branch("vfatQual", &b_vfatQual, "vfatQual/I");
   t_hit->Branch("vfatFlag", &b_vfatFlag, "vfatFlag/I");
   t_hit->Branch("vfatBc", &b_vfatBc, "vfatBc/I");
@@ -536,7 +540,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
 	  // check quality of chamber
 	  bool gebFu = false, isGeb = false;
-	  int vfatQual = 0, vfatFlag = 0, vfatBc = 0, nvfat = 0, stuckd = -99, errorc = -99, vfatdbx, bx;
+	  int vfatQual = 0, vfatFlag = 0, vfatBc = 0, nvfat = 0, stuckd = -99, errorc = -99, vfatdbx, bx, ohBc = -99;
 	  auto gebs = gebStatusCol->get(gemid.chamberId());
 	  for (auto geb = gebs.first; geb != gebs.second; ++geb) {
 	    isGeb = true;
@@ -544,6 +548,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	    else gebFu = true;
 	    stuckd = geb->getStuckd();
 	    errorc = geb->getErrorC();
+	    ohBc = geb->getOHBC();
 	  }
 	  auto vfats = vfatStatusCol->get(gemid); 
 	  for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
@@ -607,7 +612,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   	  m_i.in_matchingGem.push_back(matchingGem);
 	  m_i.in_GebFu.push_back(gebFu); m_i.in_IsGeb.push_back(isGeb); m_i.in_errorc.push_back(errorc); m_i.in_stuckd.push_back(stuckd);
 	  m_i.in_nvfat.push_back(nvfat); m_i.in_VfatQual.push_back(vfatQual); m_i.in_VfatFlag.push_back(vfatFlag); m_i.in_VfatBc.push_back(vfatBc); m_i.in_VfatDBx.push_back(vfatdbx);
-  	  m_f.in_nearGemPhi.push_back(gemPhi); m_f.in_nearGemEta.push_back(gemEta); m_i.in_bx.push_back(bx);
+  	  m_f.in_nearGemPhi.push_back(gemPhi); m_f.in_nearGemEta.push_back(gemEta); m_i.in_bx.push_back(bx); m_i.in_ohBc.push_back(ohBc);
   	}
       }
 
@@ -761,6 +766,7 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
       else b_gebFu = true;
       b_stuckd = geb->getStuckd();
       b_errorc = geb->getErrorC();
+      b_ohBc = geb->getOHBC();
     }
     auto vfats = vfatStatusCol->get(detId); 
     for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
