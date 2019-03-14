@@ -51,7 +51,8 @@ process.configurationMetadata = cms.untracked.PSet(
 # Other statements
 from Configuration.AlCa.GlobalTag import GlobalTag
 #process.GlobalTag = GlobalTag(process.GlobalTag, '102X_dataRun2_Prompt_v7', '')  # Run on 2018D Data
-process.GlobalTag = GlobalTag(process.GlobalTag, '102X_dataRun2_Prompt_v1', '')  # Run on 2018C Data
+# process.GlobalTag = GlobalTag(process.GlobalTag, '102X_dataRun2_Prompt_v1', '')  # Run on 2018C Data
+process.GlobalTag = GlobalTag(process.GlobalTag, '105X_dataRun2_v8', '')  # Run on 2018C Data
 #process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase1_2018_realistic', '')  # Run on 2018 Simulation
 
 # Path and EndPath definitions
