@@ -28,7 +28,7 @@ process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
 # Input source
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring( #'file:/xrootd/store/data/Run2017G/SingleMuon/RAW/v1/000/306/826/00000/FE2B6447-A4CE-E711-8DD7-02163E019CD7.root'),
-        "file:/xrootd/store/data/Run2018C/SingleMuon/RAW/v1/000/319/347/00000/041ED888-4683-E811-B79A-FA163EF19885.root"
+        "/store/data/Run2018C/SingleMuon/RAW/v1/000/319/347/00000/041ED888-4683-E811-B79A-FA163EF19885.root"
 #        "file:/cms/scratch/iwatson/GEM/CMSSW_10_3_0_pre3_vanilla/src/GEMSimulation/step2.root"
     ),
     secondaryFileNames = cms.untracked.vstring()
@@ -51,7 +51,7 @@ process.configurationMetadata = cms.untracked.PSet(
 # Other statements
 from Configuration.AlCa.GlobalTag import GlobalTag
 #process.GlobalTag = GlobalTag(process.GlobalTag, '102X_dataRun2_Prompt_v7', '')  # Run on 2018D Data
-process.GlobalTag = GlobalTag(process.GlobalTag, '102X_dataRun2_Prompt_v1', '')  # Run on 2018C Data
+process.GlobalTag = GlobalTag(process.GlobalTag, '105X_dataRun2_v8', '')  # Run on 2018C Data
 #process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase1_2018_realistic', '')  # Run on 2018 Simulation
 
 # Path and EndPath definitions
