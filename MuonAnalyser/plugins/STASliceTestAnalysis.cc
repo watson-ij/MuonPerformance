@@ -27,16 +27,18 @@
 
 #include "DataFormats/Scalers/interface/LumiScalers.h"
 #include "DataFormats/MuonData/interface/MuonDigiCollection.h"
-#include "DataFormats/GEMDigi/interface/GEMAMCStatusDigi.h"
-#include "DataFormats/GEMDigi/interface/GEMVfatStatusDigi.h"
-#include "DataFormats/GEMDigi/interface/GEMGEBStatusDigi.h"
-#include "EventFilter/GEMRawToDigi/interface/AMCdata.h"
+// //#include "DataFormats/GEMDigi/interface/GEMAMCStatusDigi.h"
+// //#include "DataFormats/GEMDigi/interface/GEMVfatStatusDigi.h"
+// //#include "DataFormats/GEMDigi/interface/GEMGEBStatusDigi.h"
+// #include "EventFilter/GEMRawToDigi/interface/AMCdata.h"
 
-#include "DataFormats/MuonData/interface/MuonDigiCollection.h"
-#include "DataFormats/GEMDigi/interface/GEMAMC13EventCollection.h"
-#include "DataFormats/GEMDigi/interface/GEMAMCdataCollection.h"
+// //#include "DataFormats/MuonData/interface/MuonDigiCollection.h"
+// #include "EventFilter/GEMRawToDigi/interface/GEMAMC13EventCollection.h"
+// #include "EventFilter/GEMRawToDigi/interface/GEMAMCdataCollection.h"
+// #include "EventFilter/GEMRawToDigi/interface/GEMVfatStatusDigiCollection.h"
+// #include "EventFilter/GEMRawToDigi/interface/GEMVfatStatusDigi.h"
+
 #include "DataFormats/GEMDigi/interface/GEMGEBStatusDigiCollection.h"
-#include "DataFormats/GEMDigi/interface/GEMVfatStatusDigiCollection.h"
 
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
@@ -95,17 +97,17 @@ private:
   edm::ESHandle<MagneticField> bField_;
   edm::EDGetTokenT<LumiScalersCollection> lumiScalers_;
 
-  edm::EDGetTokenT<GEMAMC13EventCollection> amc13Event_;
-  edm::EDGetTokenT<GEMAMCdataCollection> amcData_;
-  edm::EDGetTokenT<GEMGEBStatusDigiCollection> gebStatusCol_;
-  edm::EDGetTokenT<GEMVfatStatusDigiCollection> vfatStatusCol_;
+  // edm::EDGetTokenT<GEMAMC13EventCollection> amc13Event_;
+  // edm::EDGetTokenT<GEMAMCdataCollection> amcData_;
+  // edm::EDGetTokenT<GEMGEBStatusDigiCollection> gebStatusCol_;
+  // edm::EDGetTokenT<GEMVfatStatusDigiCollection> vfatStatusCol_;
 
   bool checkEtaPartitionGood(const GEMEtaPartition* part);
   
-  edm::Handle<GEMAMC13EventCollection> amc13Event;
-  edm::Handle<GEMAMCdataCollection> amcData;
-  edm::Handle<GEMGEBStatusDigiCollection> gebStatusCol;  
-  edm::Handle<GEMVfatStatusDigiCollection> vfatStatusCol;  
+  // edm::Handle<GEMAMC13EventCollection> amc13Event;
+  // edm::Handle<GEMAMCdataCollection> amcData;
+  // edm::Handle<GEMGEBStatusDigiCollection> gebStatusCol;  
+  // edm::Handle<GEMVfatStatusDigiCollection> vfatStatusCol;  
 
   ULong64_t b_event;
   int b_run, b_lumi;
@@ -205,10 +207,10 @@ STASliceTestAnalysis::STASliceTestAnalysis(const edm::ParameterSet& iConfig) :
   edm::ParameterSet serviceParameters = iConfig.getParameter<edm::ParameterSet>("ServiceParameters");
   theService_ = new MuonServiceProxy(serviceParameters);
   lumiScalers_ = consumes<LumiScalersCollection>(iConfig.getParameter<edm::InputTag>("lumiScalers"));
-  amc13Event_ = consumes<GEMAMC13EventCollection>(iConfig.getParameter<edm::InputTag>("amc13Event"));
-  amcData_ = consumes<GEMAMCdataCollection>(iConfig.getParameter<edm::InputTag>("amcData"));
-  gebStatusCol_ = consumes<GEMGEBStatusDigiCollection>(iConfig.getParameter<edm::InputTag>("gebStatusCol"));
-  vfatStatusCol_ = consumes<GEMVfatStatusDigiCollection>(iConfig.getParameter<edm::InputTag>("vfatStatusCol"));
+  // amc13Event_ = consumes<GEMAMC13EventCollection>(iConfig.getParameter<edm::InputTag>("amc13Event"));
+  // amcData_ = consumes<GEMAMCdataCollection>(iConfig.getParameter<edm::InputTag>("amcData"));
+  // gebStatusCol_ = consumes<GEMGEBStatusDigiCollection>(iConfig.getParameter<edm::InputTag>("gebStatusCol"));
+  // vfatStatusCol_ = consumes<GEMVfatStatusDigiCollection>(iConfig.getParameter<edm::InputTag>("vfatStatusCol"));
  
   t_event = fs->make<TTree>("Event", "Event");
   t_event->Branch("nMuons", &b_nMuons, "nMuons/I");
@@ -398,27 +400,27 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
   edm::Handle<reco::TrackCollection> muons;
   iEvent.getByToken(staTracks_, muons);
 
-  iEvent.getByToken(amc13Event_, amc13Event);
-  iEvent.getByToken(amcData_, amcData);
-  iEvent.getByToken(gebStatusCol_, gebStatusCol);
-  iEvent.getByToken(vfatStatusCol_, vfatStatusCol);
+  // iEvent.getByToken(amc13Event_, amc13Event);
+  // iEvent.getByToken(amcData_, amcData);
+  // iEvent.getByToken(gebStatusCol_, gebStatusCol);
+  // iEvent.getByToken(vfatStatusCol_, vfatStatusCol);
 
   iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", ttrackBuilder_);
   theService_->update(iSetup);
   auto propagator = theService_->propagator("SteppingHelixPropagatorAny");
 
-  b_latency = -1;
+  // b_latency = -1;
 
-  b_amcBx = -99;
-  for (auto g : *amcData) {
-    for (auto a = g.second.first; a != g.second.second; ++a) {
-      b_amcBx = a->bx();
-      if (b_latency != -1 && b_latency != a->param1())
- 	std::cout << "CHANGING LATENCY - old: " << b_latency << " new: " << a->param1() << std::endl;
-      b_latency = a->param1();
-      if (b_latency == -1) std::cout << "-1 LATENCY VALUE - " << iEvent.id().event() << " " << iEvent.id().run() << std::endl;
-    }
-  }
+  // b_amcBx = -99;
+  // for (auto g : *amcData) {
+  //   for (auto a = g.second.first; a != g.second.second; ++a) {
+  //     b_amcBx = a->bx();
+  //     if (b_latency != -1 && b_latency != a->param1())
+  //       std::cout << "CHANGING LATENCY - old: " << b_latency << " new: " << a->param1() << std::endl;
+  //     b_latency = a->param1();
+  //     if (b_latency == -1) std::cout << "-1 LATENCY VALUE - " << iEvent.id().event() << " " << iEvent.id().run() << std::endl;
+  //   }
+  // }
 
   nEvents++;
 
@@ -541,23 +543,23 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	  // check quality of chamber
 	  bool gebFu = false, isGeb = false;
 	  int vfatQual = 0, vfatFlag = 0, vfatBc = 0, nvfat = 0, stuckd = -99, errorc = -99, vfatdbx, bx, ohBc = -99;
-	  auto gebs = gebStatusCol->get(gemid.chamberId());
-	  for (auto geb = gebs.first; geb != gebs.second; ++geb) {
-	    isGeb = true;
-	    if (int(geb->getInFu()) != 0) gebFu = false;
-	    else gebFu = true;
-	    stuckd = geb->getStuckd();
-	    errorc = geb->getErrorC();
-	    ohBc = geb->getOHBC();
-	  }
-	  auto vfats = vfatStatusCol->get(gemid); 
-	  for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
-	    nvfat++;
-	    vfatdbx += b_amcBx - vfat->bc();
-	    if (vfat->bc() == b_amcBx) vfatBc++;
-	    if (int(vfat->quality()) == 0) vfatQual++;
-	    if (int(vfat->flag()) == 0) vfatFlag++;
-	  }
+	  // auto gebs = gebStatusCol->get(gemid.chamberId());
+	  // for (auto geb = gebs.first; geb != gebs.second; ++geb) {
+	  //   isGeb = true;
+	  //   if (int(geb->getInFu()) != 0) gebFu = false;
+	  //   else gebFu = true;
+	  //   stuckd = geb->getStuckd();
+	  //   errorc = geb->getErrorC();
+	  //   ohBc = geb->getOHBC();
+	  // }
+	  // auto vfats = vfatStatusCol->get(gemid); 
+	  // for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
+	  //   nvfat++;
+	  //   vfatdbx += b_amcBx - vfat->bc();
+	  //   if (vfat->bc() == b_amcBx) vfatBc++;
+	  //   if (int(vfat->quality()) == 0) vfatQual++;
+	  //   if (int(vfat->flag()) == 0) vfatFlag++;
+	  // }
 	  
   	  for (auto hit = gemRecHit; hit != recHitsRange.second; ++hit) {
   	    auto gemGlob = ch->toGlobal(hit->localPosition());
@@ -757,24 +759,24 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
     b_z = globalPosition.z();
     
 
-    b_gebFu = false, b_isGeb = false;
-    b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
-    auto gebs = gebStatusCol->get(detId.chamberId()); 
-    for (auto geb = gebs.first; geb != gebs.second; ++geb) {
-      b_isGeb = true;
-      if (int(geb->getInFu()) != 0) b_gebFu = false;
-      else b_gebFu = true;
-      b_stuckd = geb->getStuckd();
-      b_errorc = geb->getErrorC();
-      b_ohBc = geb->getOHBC();
-    }
-    auto vfats = vfatStatusCol->get(detId); 
-    for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
-      b_nvfat++;
-      if (vfat->bc() == b_amcBx) b_vfatBc++;
-      if (int(vfat->quality()) == 0) b_vfatQual++;
-      if (int(vfat->flag()) == 0) b_vfatFlag++;
-    }
+    // b_gebFu = false, b_isGeb = false;
+    // b_vfatQual = 0, b_vfatFlag = 0, b_vfatBc = 0, b_nvfat = 0, b_stuckd = -99, b_errorc = -99;
+    // auto gebs = gebStatusCol->get(detId.chamberId()); 
+    // for (auto geb = gebs.first; geb != gebs.second; ++geb) {
+    //   b_isGeb = true;
+    //   if (int(geb->getInFu()) != 0) b_gebFu = false;
+    //   else b_gebFu = true;
+    //   b_stuckd = geb->getStuckd();
+    //   b_errorc = geb->getErrorC();
+    //   b_ohBc = geb->getOHBC();
+    // }
+    // auto vfats = vfatStatusCol->get(detId); 
+    // for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
+    //   b_nvfat++;
+    //   if (vfat->bc() == b_amcBx) b_vfatBc++;
+    //   if (int(vfat->quality()) == 0) b_vfatQual++;
+    //   if (int(vfat->flag()) == 0) b_vfatFlag++;
+    // }
 
     t_hit->Fill();
     b_nHitsInHitTree++;
@@ -790,27 +792,27 @@ STASliceTestAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
 bool STASliceTestAnalysis::checkEtaPartitionGood(const GEMEtaPartition* part)
 {
-  GEMDetId rId = part->id();
-  int amcBx = -1;
+  // GEMDetId rId = part->id();
+  // int amcBx = -1;
 
-  for (GEMAMCdataCollection::DigiRangeIterator amcsIt = amcData->begin(); amcsIt != amcData->end(); ++amcsIt){
-    auto amcs = (*amcsIt).second;
-    for (auto amc = amcs.first; amc != amcs.second; ++amc) {
-      amcBx = amc->bx();
-    }
-  }
+  // for (GEMAMCdataCollection::DigiRangeIterator amcsIt = amcData->begin(); amcsIt != amcData->end(); ++amcsIt){
+  //   auto amcs = (*amcsIt).second;
+  //   for (auto amc = amcs.first; amc != amcs.second; ++amc) {
+  //     amcBx = amc->bx();
+  //   }
+  // }
   
-  auto gebs = gebStatusCol->get(rId.chamberId()); 
-  for (auto geb = gebs.first; geb != gebs.second; ++geb) {
-    if (int(geb->getInFu()) != 0 ) return false;
-  }
+  // auto gebs = gebStatusCol->get(rId.chamberId()); 
+  // for (auto geb = gebs.first; geb != gebs.second; ++geb) {
+  //   if (int(geb->getInFu()) != 0 ) return false;
+  // }
   
-  auto vfats = vfatStatusCol->get(rId); 
-  for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
-    if (vfat->bc() != amcBx ) return false;
-    if (int(vfat->quality()) != 0 ) return false;
-    if (int(vfat->flag()) != 0 ) return false;
-  }
+  // auto vfats = vfatStatusCol->get(rId); 
+  // for (auto vfat = vfats.first; vfat != vfats.second; ++vfat) {
+  //   if (vfat->bc() != amcBx ) return false;
+  //   if (int(vfat->quality()) != 0 ) return false;
+  //   if (int(vfat->flag()) != 0 ) return false;
+  // }
   return true;
 }
 
